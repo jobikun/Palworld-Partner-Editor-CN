@@ -60,9 +60,10 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ steps.version.outputs.version }}"
-          $name = "帕鲁伙伴编辑器_v$version"
+          $folderName = "帕鲁伙伴编辑器_v$version"
+          $assetName = "Palworld-Partner-Editor-CN_v$version.zip"
           $root = Join-Path $PWD "release-build"
-          $folder = Join-Path $root $name
+          $folder = Join-Path $root $folderName
           $source = Join-Path $folder "源代码"
           New-Item -ItemType Directory -Path $source -Force | Out-Null
 
@@ -88,10 +89,10 @@ jobs:
           @("帕鲁伙伴编辑器.exe", "SHA256: $hash") |
             Set-Content -LiteralPath (Join-Path $folder "文件校验.txt") -Encoding UTF8
 
-          $zip = Join-Path $root "$name.zip"
+          $zip = Join-Path $root $assetName
           Compress-Archive -LiteralPath $folder -DestinationPath $zip -CompressionLevel Optimal
           "zip=$zip" >> $env:GITHUB_OUTPUT
-          "name=$name.zip" >> $env:GITHUB_OUTPUT
+          "name=$assetName" >> $env:GITHUB_OUTPUT
 
       - name: 创建 GitHub Release
         shell: pwsh
