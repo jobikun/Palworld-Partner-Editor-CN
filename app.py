@@ -13,7 +13,7 @@ from backend import EditorError, SUITS, SaveSession, find_world_saves, palworld_
 
 
 APP_NAME = "帕鲁伙伴编辑器"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 
 
 class App(tk.Tk):
@@ -125,9 +125,9 @@ class App(tk.Tk):
         self.tree.heading("#0", text="伙伴")
         self.tree.heading("level", text="等级")
         self.tree.heading("stars", text="星级")
-        self.tree.column("#0", width=230, stretch=True)
-        self.tree.column("level", width=55, anchor="center", stretch=False)
-        self.tree.column("stars", width=55, anchor="center", stretch=False)
+        self.tree.column("#0", width=220, minwidth=150, stretch=True)
+        self.tree.column("level", width=52, minwidth=52, anchor="center", stretch=False)
+        self.tree.column("stars", width=90, minwidth=90, anchor="center", stretch=False)
         scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.pack(side="left", fill="both", expand=True)
@@ -378,7 +378,7 @@ class App(tk.Tk):
     def _star_text(snap):
         if snap["rank_warning"] is not None:
             return "异常"
-        return "4+（超限）" if snap["condenser"] > 4 else str(snap["stars"])
+        return f"超限 {snap['condenser']}" if snap["condenser"] > 4 else str(snap["stars"])
 
     def _toggle_advanced(self, sync_values=True):
         advanced = self.advanced_var.get()

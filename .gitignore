@@ -1,5 +1,6 @@
 __pycache__/
-*.py[cod]
+*.pyc
+*.pyo
 .venv/
 build/
 dist/
@@ -9,4 +10,3 @@ testdata/
 PalPartnerEditor_Backups/
 .idea/
 .vscode/
-

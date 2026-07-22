@@ -4,10 +4,8 @@
 
 ## 下载
 
-无需 Python 的 Windows 独立版位于 `release/帕鲁伙伴编辑器_v1.3.0.zip`。
-源码构建方法见 `BUILD.md`。
-
-发布后的最新版也可以从 GitHub 仓库右侧的 **Releases** 下载。
+无需 Python 的 Windows 独立版请从 GitHub 仓库右侧的 **Releases** 下载。
+源码构建方法见 `BUILD.md`；`release/` 中保留的是首次发布的 v1.3.0 包。
 
 ## 自动打包发布
 
