@@ -1,0 +1,308 @@
+{
+    "UNKNOWN": {
+        "Rating": "-1"
+    },
+    "NONE": {
+        "Rating": "1"
+    },
+    "ElementResist_Normal_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementResist_Dark_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementResist_Dragon_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementResist_Ice_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementResist_Fire_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementResist_Leaf_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementResist_Earth_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementResist_Thunder_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementResist_Aqua_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementBoost_Normal_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementBoost_Dark_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementBoost_Dragon_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementBoost_Ice_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementBoost_Fire_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementBoost_Leaf_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementBoost_Earth_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementBoost_Thunder_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementBoost_Aqua_1_PAL": {
+        "Rating": "1"
+    },
+    "ElementBoost_Normal_2_PAL": {
+        "Rating": "3"
+    },
+    "ElementBoost_Dark_2_PAL": {
+        "Rating": "3"
+    },
+    "ElementBoost_Dragon_2_PAL": {
+        "Rating": "3"
+    },
+    "ElementBoost_Ice_2_PAL": {
+        "Rating": "3"
+    },
+    "ElementBoost_Fire_2_PAL": {
+        "Rating": "3"
+    },
+    "ElementBoost_Leaf_2_PAL": {
+        "Rating": "3"
+    },
+    "ElementBoost_Earth_2_PAL": {
+        "Rating": "3"
+    },
+    "ElementBoost_Thunder_2_PAL": {
+        "Rating": "3"
+    },
+    "ElementBoost_Aqua_2_PAL": {
+        "Rating": "3"
+    },
+    "Witch": {
+        "Rating": "4"
+    },
+    "PAL_ALLAttack_up1": {
+        "Rating": "1"
+    },
+    "PAL_ALLAttack_up2": {
+        "Rating": "3"
+    },
+    "PAL_ALLAttack_up3": {
+        "Rating": "4"
+    },
+    "PAL_ALLAttack_down1": {
+        "Rating": "-1"
+    },
+    "PAL_ALLAttack_down2": {
+        "Rating": "-3"
+    },
+    "Deffence_up1": {
+        "Rating": "1"
+    },
+    "Deffence_up2": {
+        "Rating": "3"
+    },
+    "Deffence_up3": {
+        "Rating": "4"
+    },
+    "Deffence_down1": {
+        "Rating": "-1"
+    },
+    "Deffence_down2": {
+        "Rating": "-3"
+    },
+    "TrainerMining_up1": {
+        "Rating": "3"
+    },
+    "TrainerLogging_up1": {
+        "Rating": "3"
+    },
+    "TrainerATK_UP_1": {
+        "Rating": "3"
+    },
+    "TrainerWorkSpeed_UP_1": {
+        "Rating": "3"
+    },
+    "TrainerDEF_UP_1": {
+        "Rating": "3"
+    },
+    "PAL_Sanity_Down_1": {
+        "Rating": "1"
+    },
+    "PAL_Sanity_Down_2": {
+        "Rating": "3"
+    },
+    "PAL_Sanity_Down_3": {
+        "Rating": "4"
+    },
+    "PAL_Sanity_Up_1": {
+        "Rating": "-1"
+    },
+    "PAL_Sanity_Up_2": {
+        "Rating": "-2"
+    },
+    "PAL_FullStomach_Down_1": {
+        "Rating": "1"
+    },
+    "PAL_FullStomach_Down_2": {
+        "Rating": "3"
+    },
+    "PAL_FullStomach_Down_3": {
+        "Rating": "4"
+    },
+    "PAL_FullStomach_Up_1": {
+        "Rating": "-1"
+    },
+    "PAL_FullStomach_Up_2": {
+        "Rating": "-2"
+    },
+    "CraftSpeed_up1": {
+        "Rating": "1"
+    },
+    "CraftSpeed_up2": {
+        "Rating": "3"
+    },
+    "CraftSpeed_up3": {
+        "Rating": "4"
+    },
+    "CraftSpeed_down1": {
+        "Rating": "-1"
+    },
+    "CraftSpeed_down2": {
+        "Rating": "-3"
+    },
+    "MoveSpeed_up_1": {
+        "Rating": "1"
+    },
+    "MoveSpeed_up_2": {
+        "Rating": "3"
+    },
+    "MoveSpeed_up_3": {
+        "Rating": "4"
+    },
+    "PAL_CorporateSlave": {
+        "Rating": "1"
+    },
+    "PAL_rude": {
+        "Rating": "1"
+    },
+    "Noukin": {
+        "Rating": "2"
+    },
+    "PAL_oraora": {
+        "Rating": "1"
+    },
+    "PAL_conceited": {
+        "Rating": "1"
+    },
+    "PAL_SpiritualInst": {
+        "Rating": "-1"
+    },
+    "PAL_masochist": {
+        "Rating": "1"
+    },
+    "PAL_sadist": {
+        "Rating": "1"
+    },
+    "Rare": {
+        "Rating": "4"
+    },
+    "Legend": {
+        "Rating": "4"
+    },
+    "Stamina_Up_1": {
+        "Rating": "1"
+    },
+    "Stamina_Up_2": {
+        "Rating": "3"
+    },
+    "Stamina_Up_3": {
+        "Rating": "4"
+    },
+    "Stamina_Down_1": {
+        "Rating": "-1"
+    },
+    "SalePrice_Up_1": {
+        "Rating": "1"
+    },
+    "SalePrice_Up_2": {
+        "Rating": "3"
+    },
+    "SalePrice_Down_1": {
+        "Rating": "-1"
+    },
+    "CoolTimeReduction_Up_1": {
+        "Rating": "3"
+    },
+    "CoolTimeReduction_Up_2": {
+        "Rating": "1"
+    },
+    "CoolTimeReduction_Down_1": {
+        "Rating": "-1"
+    },
+    "NonKilling": {
+        "Rating": "-1"
+    },
+    "Nocturnal": {
+        "Rating": "1"
+    },
+    "Vampire": {
+        "Rating": "4"
+    },
+    "Alien" : {
+        "Rating": "1"
+    },
+    "EternalFlame" : {
+        "Rating": "4"
+    },
+    "Invader": {
+        "Rating": "4"
+    },
+    "Test_PalEgg_HatchingSpeed_Up": {
+        "Rating": "3"
+    },
+    "Nushi": {
+        "Rating": "4"
+    },
+    "SwimSpeed_up_1": {
+        "Rating": "1"
+    },
+    "SwimSpeed_up_2": {
+        "Rating": "3"
+    },
+    "SwimSpeed_up_3": {
+        "Rating": "4"
+    },
+    "GYM_NAME_Meadow": {
+        "Rating": "3"
+    },
+    "GYM_NAME_Forest": {
+        "Rating": "3"
+    },
+    "GYM_NAME_Desert": {
+        "Rating": "3"
+    },
+    "GYM_NAME_Volcano": {
+        "Rating": "3"
+    },
+    "GYM_NAME_Snow": {
+        "Rating": "3"
+    },
+    "GYM_NAME_Sakurajima": {
+        "Rating": "3"
+    },
+    "GYM_NAME_Viking": {
+        "Rating": "3"
+    },
+    "Salvation": {
+        "Rating": "4"
+    }
+}

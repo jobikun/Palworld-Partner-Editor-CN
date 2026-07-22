@@ -1,0 +1,9 @@
+The bundled palworld_save_tools package was taken unchanged from
+EternalWraith/PalEdit tag v0.12.1 (PalEdit's palworld_save_tools.zip).
+
+Source: https://github.com/EternalWraith/PalEdit/tree/v0.12.1
+Bundle SHA-256: 6316BD06B89BF57685D6FD7BA6E3F11573B54851D507776366D244A11A9B4ED5
+Windows ooz.pyd SHA-256: 50186FAF865775C32C267501B7430B8B67147E67CC5406BB28684C22CCCBC7C0
+
+PalEdit is distributed under the MIT License. See
+THIRD_PARTY_PALEDIT_LICENSE.txt.

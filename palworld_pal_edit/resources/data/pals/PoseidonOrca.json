@@ -1,0 +1,40 @@
+{
+    "CodeName": "PoseidonOrca",
+    "Type": [
+        "Water",
+        "None"
+    ],
+    "Moveset": {
+        "EPalWazaID::WaterGun": 1,
+        "EPalWazaID::BubbleShot": 7,
+        "EPalWazaID::LineGeyser": 15,
+        "EPalWazaID::DiversionLaser": 22,
+        "EPalWazaID::WallSplash": 30,
+        "EPalWazaID::RipTide": 40,
+        "EPalWazaID::SeaGush": 50,
+        "EPalWazaID::Unique_PoseidonOrca_TorrentLaser": 60
+    },
+    "RaidMoveset": {},
+    "Scaling": {
+        "HP": 105,
+        "PHY": 100,
+        "MAG": 145,
+        "DEF": 125
+    },
+    "Suitabilities": {
+        "EmitFlame": 0,
+        "Watering": 4,
+        "Seeding": 0,
+        "GenerateElectricity": 0,
+        "Handcraft": 0,
+        "Collection": 0,
+        "Deforest": 0,
+        "Mining": 0,
+        "OilExtraction": 0,
+        "ProductMedicine": 0,
+        "Cool": 0,
+        "Transport": 0,
+        "MonsterFarm": 0
+    },
+    "Human": false
+}

@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+build/
+dist/
+testdata/
+*.sav
+*.sav.tmp
+PalPartnerEditor_Backups/
+.idea/
+.vscode/
+

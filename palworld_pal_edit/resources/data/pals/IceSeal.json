@@ -1,0 +1,39 @@
+{
+    "CodeName": "IceSeal",
+    "Type": [
+        "Ice",
+        "Water"
+    ],
+    "Moveset": {
+        "EPalWazaID::IceMissile": 1,
+        "EPalWazaID::WaterGun": 7,
+        "EPalWazaID::BlizzardLance": 15,
+        "EPalWazaID::LineGeyser": 22,
+        "EPalWazaID::IceWall": 30,
+        "EPalWazaID::IcicleLine": 40,
+        "EPalWazaID::RipTide": 50
+    },
+    "RaidMoveset": {},
+    "Scaling": {
+        "HP": 95,
+        "PHY": 100,
+        "MAG": 105,
+        "DEF": 105
+    },
+    "Suitabilities": {
+        "EmitFlame": 0,
+        "Watering": 2,
+        "Seeding": 0,
+        "GenerateElectricity": 0,
+        "Handcraft": 0,
+        "Collection": 0,
+        "Deforest": 0,
+        "Mining": 0,
+        "OilExtraction": 0,
+        "ProductMedicine": 0,
+        "Cool": 3,
+        "Transport": 0,
+        "MonsterFarm": 0
+    },
+    "Human": false
+}

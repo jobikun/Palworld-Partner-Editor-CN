@@ -1,0 +1,39 @@
+{
+    "CodeName": "IceCrocodile",
+    "Type": [
+        "Ice",
+        "Water"
+    ],
+    "Moveset": {
+        "EPalWazaID::WaterGun": 1,
+        "EPalWazaID::IceBlade": 7,
+        "EPalWazaID::FrostBreath": 15,
+        "EPalWazaID::Unique_IceCrocodile_SpitAttack": 22,
+        "EPalWazaID::IceWall": 30,
+        "EPalWazaID::DiversionLaser": 40,
+        "EPalWazaID::DiamondFall": 50
+    },
+    "RaidMoveset": {},
+    "Scaling": {
+        "HP": 75,
+        "PHY": 100,
+        "MAG": 80,
+        "DEF": 85
+    },
+    "Suitabilities": {
+        "EmitFlame": 0,
+        "Watering": 1,
+        "Seeding": 0,
+        "GenerateElectricity": 0,
+        "Handcraft": 0,
+        "Collection": 0,
+        "Deforest": 0,
+        "Mining": 0,
+        "OilExtraction": 0,
+        "ProductMedicine": 0,
+        "Cool": 2,
+        "Transport": 1,
+        "MonsterFarm": 0
+    },
+    "Human": false
+}

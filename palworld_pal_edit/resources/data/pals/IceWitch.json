@@ -1,0 +1,39 @@
+{
+    "CodeName": "IceWitch",
+    "Type": [
+        "Ice",
+        "None"
+    ],
+    "Moveset": {
+        "EPalWazaID::IceMissile": 1,
+        "EPalWazaID::IceBlade": 7,
+        "EPalWazaID::BlizzardLance": 15,
+        "EPalWazaID::FrostBreath": 22,
+        "EPalWazaID::IceWall": 30,
+        "EPalWazaID::IcicleThrow": 40,
+        "EPalWazaID::DiamondFall": 50
+    },
+    "RaidMoveset": {},
+    "Scaling": {
+        "HP": 95,
+        "PHY": 100,
+        "MAG": 115,
+        "DEF": 105
+    },
+    "Suitabilities": {
+        "EmitFlame": 0,
+        "Watering": 0,
+        "Seeding": 0,
+        "GenerateElectricity": 0,
+        "Handcraft": 2,
+        "Collection": 0,
+        "Deforest": 0,
+        "Mining": 0,
+        "OilExtraction": 0,
+        "ProductMedicine": 2,
+        "Cool": 3,
+        "Transport": 1,
+        "MonsterFarm": 0
+    },
+    "Human": false
+}

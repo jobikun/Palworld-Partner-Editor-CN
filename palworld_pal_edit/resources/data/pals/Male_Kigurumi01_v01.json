@@ -1,0 +1,29 @@
+{
+    "CodeName": "Male_Kigurumi01_v01",
+    "Type": [
+        "None"
+    ],
+    "Moveset": {},
+    "Scaling": {
+        "HP": 20,
+        "PHY": 20,
+        "MAG": 20,
+        "DEF": 10
+    },
+    "Suitabilities": {
+        "EmitFlame": 0,
+        "Watering": 0,
+        "Seeding": 0,
+        "GenerateElectricity": 0,
+        "Handcraft": 1,
+        "Collection": 0,
+        "Deforest": 0,
+        "Mining": 1,
+        "OilExtraction": 0,
+        "ProductMedicine": 0,
+        "Cool": 0,
+        "Transport": 1,
+        "MonsterFarm": 0
+    },
+    "Human": true
+}
