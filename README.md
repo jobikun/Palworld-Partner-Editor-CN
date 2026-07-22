@@ -7,6 +7,17 @@
 无需 Python 的 Windows 独立版位于 `release/帕鲁伙伴编辑器_v1.3.0.zip`。
 源码构建方法见 `BUILD.md`。
 
+发布后的最新版也可以从 GitHub 仓库右侧的 **Releases** 下载。
+
+## 自动打包发布
+
+1. 修改源码。
+2. 同步修改 `app.py` 中的 `APP_VERSION`，例如从 `1.3.0` 改为 `1.3.1`。
+3. 使用 GitHub Desktop 提交并推送到 `main`。
+4. GitHub Actions 会自动检查源码、构建 Windows EXE、生成 ZIP 和 SHA256，并创建 `v1.3.1` Release。
+
+若对应版本标签已经存在，自动流程会停止，避免覆盖已经发布的版本。
+
 ## 功能
 
 - 自动定位最近使用的 `Level.sav`

@@ -11,5 +11,7 @@ python -m venv .venv
 
 生成的单文件程序位于 `dist\帕鲁伙伴编辑器.exe`。
 
-仓库禁止提交任何 `.sav` 存档。功能测试请始终使用历史存档的副本。
+推送到 `main` 后，`.github/workflows/release.yml` 会根据 `app.py` 的
+`APP_VERSION` 自动执行相同构建并发布 GitHub Release。每次发布前必须提高版本号。
 
+仓库禁止提交任何 `.sav` 存档。功能测试请始终使用历史存档的副本。
