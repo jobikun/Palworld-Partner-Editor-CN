@@ -29,8 +29,11 @@ from palworld_save_tools.paltypes import PALWORLD_CUSTOM_PROPERTIES, PALWORLD_TY
 
 from palworld_pal_edit import PalInfo
 from palworld_pal_edit.EmptyObjectHandler import (
+    EmptyExpObject,
     EmptyGotWorkObject,
+    EmptyLevelObject,
     EmptyRankObject,
+    EmptySkillObject,
     EmptySoulObject,
     EmptyTalentObject,
     EmptyWorkObject,
@@ -77,6 +80,10 @@ def _resource_path(name: str) -> Path:
     return Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)) / name
 
 
+class EditorError(RuntimeError):
+    pass
+
+
 def _load_pal_database() -> dict[str, dict[str, Any]]:
     path = _resource_path("palcalc_db.json")
     try:
@@ -95,10 +102,99 @@ def _load_pal_database() -> dict[str, dict[str, Any]]:
 
 
 PAL_DATABASE: dict[str, dict[str, Any]] = {}
+PAL_CODE_CASEFOLD: dict[str, str] = {}
+EXPERIMENTAL_SPECIES: dict[str, dict[str, Any]] = {
+    # PalworldSaveTools 2.1.9 identifies this story boss as Astralym.
+    # It has no partner skill, work suitability, run speed, or ride speed.
+    "WorldTreeDragon": {
+        "Name": "Astralym",
+        "LocalizedNames": {"zh-Hans": "枯星龙"},
+        "InternalIndex": 204,
+        "Hp": 200,
+        "Attack": 200,
+        "Defense": 200,
+        "CraftSpeed": 100,
+        "WorkSuitability": {},
+    }
+}
 
 
-class EditorError(RuntimeError):
-    pass
+def _load_passive_database() -> dict[str, dict[str, Any]]:
+    path = _resource_path("palcalc_db.json")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise EditorError(f"无法加载 Palworld 1.0 词条数据：{exc}") from exc
+    result: dict[str, dict[str, Any]] = {}
+    for passive in payload.get("PassiveSkills", []):
+        code = str(passive.get("InternalName") or "").strip()
+        names = passive.get("LocalizedNames") or {}
+        chinese_name = str(names.get("zh-Hans") or names.get("zh-CN") or "").strip()
+        if (
+            code
+            and passive.get("IsStandardPassiveSkill") is True
+            and chinese_name
+            and chinese_name not in {"-", "zh-Hans Text"}
+        ):
+            descriptions = passive.get("LocalizedDescriptions") or {}
+            description = str(
+                descriptions.get("zh-Hans")
+                or descriptions.get("zh-CN")
+                or passive.get("Description")
+                or ""
+            )
+            result[code] = {
+                "code": code,
+                "name": chinese_name,
+                "rank": int(passive.get("Rank") or 0),
+                "description": "；".join(part.strip() for part in description.splitlines() if part.strip()),
+            }
+    return result
+
+
+PASSIVE_DATABASE: dict[str, dict[str, Any]] = _load_passive_database()
+PASSIVE_EMPTY_DISPLAY = "（空）"
+
+
+def passive_display(code: str) -> str:
+    if not code:
+        return PASSIVE_EMPTY_DISPLAY
+    data = PASSIVE_DATABASE.get(code)
+    if not data:
+        return f"未知词条 [{code}]"
+    rank = data["rank"]
+    rating = "★" * rank if rank > 0 else (f"负{abs(rank)}★" if rank < 0 else "特殊")
+    return f"{rating} {data['name']} [{code}]"
+
+
+PASSIVE_CHOICES = [PASSIVE_EMPTY_DISPLAY] + sorted(
+    (passive_display(code) for code in PASSIVE_DATABASE),
+    key=lambda text: (
+        -int(PASSIVE_DATABASE[text.rsplit("[", 1)[1][:-1]]["rank"]),
+        PASSIVE_DATABASE[text.rsplit("[", 1)[1][:-1]]["name"],
+    ),
+)
+
+TOP_PASSIVE_PRESETS: dict[str, tuple[str, ...]] = {
+    "神仙全能": ("WorldTree_ATK", "WorldTree_DEF", "WorldTree_CraftSpeed", "WorldTree_MoveSpeed"),
+    "神仙战神": ("WorldTree_ATK", "PAL_ALLAttack_up3", "Legend", "CoolTimeReduction_Up_1"),
+    "顶级战斗": ("PAL_ALLAttack_up3", "Legend", "CoolTimeReduction_Up_1", "Deffence_up3"),
+    "极限攻击": ("WorldTree_ATK", "PAL_ALLAttack_up3", "Noukin", "CoolTimeReduction_Up_1"),
+    "防御坦克": ("WorldTree_DEF", "Deffence_up3", "Deffence_up2", "Legend"),
+    "生存吸血": ("MutationPal_Immortal", "Vampire", "Deffence_up3", "Legend"),
+    "手工顶级": ("WorldTree_CraftSpeed", "CraftSpeed_up3", "CraftSpeed_up2", "CraftSpeed_up1"),
+    "制药顶级": ("WorldTree_CraftSpeed", "CraftSpeed_up3", "CraftSpeed_up2", "CraftSpeed_up1"),
+    "采矿顶级": ("WorldTree_CraftSpeed", "CraftSpeed_up3", "CraftSpeed_up2", "CraftSpeed_up1"),
+    "顶级工作": ("WorldTree_CraftSpeed", "CraftSpeed_up3", "CraftSpeed_up2", "CraftSpeed_up1"),
+    "据点通宵": ("WorldTree_CraftSpeed", "CraftSpeed_up3", "Vampire", "PAL_FullStomach_Down_3"),
+    "飞行顶级": ("WorldTree_MoveSpeed", "MoveSpeed_up_3", "Stamina_Up_3", "Legend"),
+    "陆地极速": ("WorldTree_MoveSpeed", "MoveSpeed_up_3", "MoveSpeed_up_2", "Legend"),
+    "水上顶级": ("WorldTree_MoveSpeed", "SwimSpeed_up_3", "Stamina_Up_3", "Legend"),
+    "骑乘续航": ("Stamina_Up_3", "Stamina_Up_1", "MoveSpeed_up_3", "Legend"),
+    "配种顶级": ("Test_PalEgg_HatchingSpeed_Up", "MutationPal_Babysitter", "Vampire", "PAL_FullStomach_Down_3"),
+}
+
+MAX_PAL_LEVEL = 80
 
 
 def _skip_decode(reader: FArchiveReader, type_name: str, size: int, path: str):
@@ -260,10 +356,11 @@ class PartnerEntity:
         code = raw_code[5:] if self.is_boss else raw_code
         if code.lower() == "sheepball":
             code = "SheepBall"
+        code = PAL_CODE_CASEFOLD.get(code.casefold(), code)
         if code not in PalInfo.PalSpecies and raw_code in PalInfo.PalSpecies:
             code = raw_code
         self._code = code
-        self._species = PAL_DATABASE.get(code)
+        self._species = PAL_DATABASE.get(code) or EXPERIMENTAL_SPECIES.get(code)
         self._legacy_species = PalInfo.PalSpecies.get(code)
 
     def IsHuman(self) -> bool:
@@ -286,6 +383,13 @@ class PartnerEntity:
 
     def GetLevel(self) -> int:
         return self._byte_value("Level", 1)
+
+    def SetLevel(self, value: int):
+        self._set_byte("Level", value, EmptyLevelObject)
+        if "Exp" not in self._obj:
+            self._obj["Exp"] = copy.deepcopy(EmptyExpObject)
+        threshold_index = min(max(value - 1, 0), len(PalInfo.xpthresholds) - 1)
+        self._obj["Exp"]["value"] = int(PalInfo.xpthresholds[threshold_index])
 
     def GetRank(self) -> int:
         return self._byte_value("Rank", 1)
@@ -357,6 +461,26 @@ class PartnerEntity:
 
     def SetRankCraftSpeed(self, value: int):
         self._set_byte("Rank_CraftSpeed", value, EmptySoulObject)
+
+    def GetPassives(self) -> list[str]:
+        container = self._obj.get("PassiveSkillList")
+        if not container:
+            return []
+        return [
+            str(value)
+            for value in container.get("value", {}).get("values", [])
+            if str(value).strip() and str(value).lower() != "none"
+        ]
+
+    def SetPassives(self, passives: list[str]):
+        cleaned = [str(value).strip() for value in passives if str(value).strip()]
+        if len(cleaned) > 4:
+            raise EditorError("每只帕鲁最多只能设置 4 个词条")
+        if len(cleaned) != len(set(cleaned)):
+            raise EditorError("同一只帕鲁不能设置重复词条")
+        if "PassiveSkillList" not in self._obj:
+            self._obj["PassiveSkillList"] = copy.deepcopy(EmptySkillObject)
+        self._obj["PassiveSkillList"]["value"]["values"] = cleaned
 
     def GetSuit(self, suit: str) -> int:
         array = self._obj.get("GotWorkSuitabilityAddRankList")
@@ -531,9 +655,10 @@ class SaveSession:
             raise EditorError("请选择有效的 Level.sav")
 
         PalInfo.LoadPals("zh-CN")
-        global PAL_DATABASE
+        global PAL_DATABASE, PAL_CODE_CASEFOLD
         if not PAL_DATABASE:
             PAL_DATABASE = _load_pal_database()
+            PAL_CODE_CASEFOLD = {code.casefold(): code for code in PAL_DATABASE}
         self.original_fingerprint = fingerprint(self.level_path)
         raw_gvas, self.save_type = decompress_sav_to_gvas(self.level_path.read_bytes())
         self.gvas = GvasFile.read(raw_gvas, PALWORLD_TYPE_HINTS, CUSTOM_PROPERTIES)
@@ -664,6 +789,7 @@ class SaveSession:
             "overcap_fields": overcap_fields,
             "overcap": entity.GetCondenserLevel() > 4 or bool(overcap_fields),
             "stats": stats,
+            "passives": entity.GetPassives(),
             "suits": {
                 key: {
                     "base": int(base_suits.get(key, 0)),
@@ -680,6 +806,8 @@ class SaveSession:
         advanced = bool(values.get("advanced"))
         iv_max = 255 if advanced else 100
         soul_max = 255 if advanced else 10
+        if "level" in values:
+            entity.SetLevel(_bounded(values["level"], 1, MAX_PAL_LEVEL, "等级"))
         entity.SetTalentHP(_bounded(values["hp_iv"], 0, iv_max, "生命 IV"))
         entity.SetAttackMelee(_bounded(values["melee_iv"], 0, iv_max, "近战攻击 IV"))
         entity.SetAttackRanged(_bounded(values["ranged_iv"], 0, iv_max, "远程攻击 IV"))
@@ -692,6 +820,8 @@ class SaveSession:
             entity.SetCondenserLevel(_bounded(values["condenser"], 0, 254, "超限浓缩等级"))
         else:
             entity.SetStars(_bounded(values["stars"], 0, 4, "星级"))
+        if "passives" in values:
+            entity.SetPassives(values["passives"])
         entity.RemoveUnsupportedSuits()
         for key in entity.base_suits():
             entity.SetSuitTotal(key, _bounded(values["suits"][key], 1, 10, f"{key} 等级"))
@@ -706,6 +836,7 @@ class SaveSession:
         for pal in pals:
             snapshot = self.snapshot(pal)
             values = {
+                "level": MAX_PAL_LEVEL,
                 "hp_iv": 255,
                 "melee_iv": 255,
                 "ranged_iv": 255,
@@ -723,6 +854,30 @@ class SaveSession:
                 },
             }
             self.apply(pal, values)
+        return len(pals)
+
+    def max_level(self, pal: PalRecord) -> dict[str, Any]:
+        pal.entity.SetLevel(MAX_PAL_LEVEL)
+        self.dirty = True
+        self.changed_ids.add(pal.instance_id)
+        snapshot = self.snapshot(pal)
+        self.expected_signatures[pal.instance_id.lower()] = self._signature(snapshot)
+        return snapshot
+
+    def max_level_all(self, player_index: int) -> int:
+        pals = self.pals_for_player(player_index)
+        for pal in pals:
+            self.max_level(pal)
+        return len(pals)
+
+    def apply_passives_all(self, player_index: int, passives: list[str]) -> int:
+        pals = self.pals_for_player(player_index)
+        for pal in pals:
+            pal.entity.SetPassives(passives)
+            self.dirty = True
+            self.changed_ids.add(pal.instance_id)
+            snapshot = self.snapshot(pal)
+            self.expected_signatures[pal.instance_id.lower()] = self._signature(snapshot)
         return len(pals)
 
     def missing_obtainable_species(self, player_index: int) -> list[str]:
@@ -765,7 +920,7 @@ class SaveSession:
         template_pal = self.pals_for_player(player_index)
         if not template_pal:
             raise EditorError("当前玩家没有可用作 1.0 结构模板的伙伴，无法安全批量生成")
-        pal_template = template_pal[0].entity._data
+        pal_template = self._safe_pal_template(template_pal)
         slot_template = slots[0] if slots else None
         if slot_template is None:
             raise EditorError("帕鲁终端没有可用的槽位结构模板")
@@ -800,6 +955,94 @@ class SaveSession:
 
         self.dirty = True
         return added_names
+
+    def add_experimental_world_tree_dragon(self, player_index: int) -> str:
+        player = self.players[player_index]
+        if any(pal.code_name == "WorldTreeDragon" for pal in self.pals_for_player(player_index)):
+            raise EditorError("当前玩家已经拥有实验枯星龙；为降低风险，本工具不重复生成")
+        if not player.group_id:
+            raise EditorError("找不到当前玩家的公会归属，无法安全生成实验伙伴")
+
+        container = self._find_character_container(player.storage_container)
+        capacity = int(container["value"]["SlotNum"]["value"])
+        slots = container["value"]["Slots"]["value"]["values"]
+        occupied = {int(slot["SlotIndex"]["value"]) for slot in slots}
+        available = [idx for idx in range(capacity) if idx not in occupied]
+        if not available:
+            raise EditorError("帕鲁终端没有空位，无法生成实验枯星龙")
+
+        current_pals = self.pals_for_player(player_index)
+        if not current_pals:
+            raise EditorError("当前玩家没有可用作 1.0 结构模板的伙伴")
+        if not slots:
+            raise EditorError("帕鲁终端没有可用的槽位结构模板")
+
+        group = self._find_group(player.group_id)
+        handles = group["value"]["RawData"]["value"]["individual_character_handle_ids"]
+        entities = self.data["properties"]["worldSaveData"]["value"]["CharacterSaveParameterMap"]["value"]
+        owner_uid = UUID.from_str(player.guid)
+        group_uid = UUID.from_str(player.group_id)
+        empty_uid = UUID.from_str("00000000-0000-0000-0000-000000000000")
+        instance_id = UUID.from_str(str(uuid.uuid4()))
+        slot_index = available[0]
+
+        pal_template = self._safe_pal_template(current_pals)
+        new_slot = copy.deepcopy(slots[0])
+        new_slot["SlotIndex"]["value"] = slot_index
+        slot_raw = new_slot["RawData"]["value"]
+        slot_raw["player_uid"] = empty_uid
+        slot_raw["instance_id"] = instance_id
+        slot_raw["permission_tribe_id"] = 0
+
+        item = self._new_pal_from_template(
+            pal_template,
+            "WorldTreeDragon",
+            instance_id,
+            owner_uid,
+            group_uid,
+            UUID.from_str(player.storage_container),
+            slot_index,
+        )
+        entity = PartnerEntity(item)
+        entity.SetLevel(MAX_PAL_LEVEL)
+        entity.SetStars(4)
+        entity.SetTalentHP(100)
+        entity.SetAttackMelee(100)
+        entity.SetAttackRanged(100)
+        entity.SetTalentDefense(100)
+        entity.SetRankHP(10)
+        entity.SetRankAttack(10)
+        entity.SetRankDefense(10)
+        entity.SetRankCraftSpeed(10)
+        entity.SetPassives(list(TOP_PASSIVE_PRESETS["神仙战神"]))
+        record = PalRecord(entity, str(instance_id), player.storage_container)
+
+        # Commit all related records only after the entity has been fully built.
+        # A malformed clone template must never leave an orphaned terminal slot.
+        slots.append(new_slot)
+        entities.append(item)
+        handles.append({"guid": empty_uid, "instance_id": instance_id})
+        self.pals.append(record)
+
+        instance_key = str(instance_id).lower()
+        self.added_species[instance_key] = "WorldTreeDragon"
+        self.changed_ids.add(str(instance_id))
+        snapshot = self.snapshot(record)
+        self.expected_signatures[instance_key] = self._signature(snapshot)
+        self.dirty = True
+        return entity.GetName()
+
+    @staticmethod
+    def _safe_pal_template(pals: list[PalRecord]) -> dict:
+        for pal in pals:
+            data = pal.entity._data
+            try:
+                save_parameter = data["value"]["RawData"]["value"]["object"]["SaveParameter"]["value"]
+            except (KeyError, TypeError):
+                continue
+            if isinstance(save_parameter, dict) and "CharacterID" in save_parameter and "SlotId" in save_parameter:
+                return data
+        raise EditorError("当前玩家没有结构完整的普通伙伴可作为 1.0 实体模板")
 
     def _find_character_container(self, container_id: str) -> dict:
         containers = self.data["properties"]["worldSaveData"]["value"]["CharacterContainerSaveData"]["value"]
@@ -868,7 +1111,7 @@ class SaveSession:
         if fingerprint(self.level_path) != self.original_fingerprint:
             raise EditorError("Level.sav 在加载后发生了变化。请重新加载，避免覆盖新进度。")
 
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         backup_dir = self.level_path.parent / "PalPartnerEditor_Backups" / timestamp
         backup_dir.mkdir(parents=True, exist_ok=False)
         shutil.copy2(self.level_path, backup_dir / "Level.sav")
@@ -921,6 +1164,7 @@ class SaveSession:
     @staticmethod
     def _signature(snapshot: dict[str, Any]) -> dict[str, Any]:
         return {
+            "level": snapshot["level"],
             "hp_iv": snapshot["hp_iv"],
             "melee_iv": snapshot["melee_iv"],
             "ranged_iv": snapshot["ranged_iv"],
@@ -931,6 +1175,7 @@ class SaveSession:
             "craft_soul": snapshot["craft_soul"],
             "stars": snapshot["stars"],
             "condenser": snapshot["condenser"],
+            "passives": snapshot["passives"],
             "suits": {key: value["extra"] for key, value in snapshot["suits"].items()},
         }
 

@@ -9,19 +9,31 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from backend import EditorError, SUITS, SaveSession, find_world_saves, palworld_running
+from backend import (
+    PASSIVE_CHOICES,
+    PASSIVE_DATABASE,
+    PASSIVE_EMPTY_DISPLAY,
+    TOP_PASSIVE_PRESETS,
+    EditorError,
+    SUITS,
+    SaveSession,
+    find_world_saves,
+    palworld_running,
+    passive_display,
+)
+from trainer_window import RuntimeWindow
 
 
 APP_NAME = "帕鲁伙伴编辑器"
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.6.1"
 
 
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"{APP_NAME} v{APP_VERSION}")
-        self.geometry("1220x900")
-        self.minsize(1080, 800)
+        self.geometry("1280x980")
+        self.minsize(1120, 860)
         try:
             self.iconbitmap(self.resource_path("app.ico"))
         except tk.TclError:
@@ -56,8 +68,14 @@ class App(tk.Tk):
         self.suit_base_labels: dict[str, ttk.Label] = {}
         self.suit_frames: dict[str, ttk.Frame] = {}
         self.suit_spinboxes: dict[str, ttk.Spinbox] = {}
+        self.passive_vars = [tk.StringVar(value=PASSIVE_EMPTY_DISPLAY) for _ in range(4)]
+        self.passive_combos: list[ttk.Combobox] = []
+        self.passive_description_var = tk.StringVar(value="选择词条后在这里显示效果说明。")
+        self.passive_preset_var = tk.StringVar(value="神仙全能")
+        self.runtime_window = None
 
         self._configure_style()
+        self._build_menu()
         self._build_ui()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.after(100, self._poll_worker)
@@ -79,13 +97,32 @@ class App(tk.Tk):
         style.configure("Treeview.Heading", font=("Microsoft YaHei UI", 10, "bold"))
         style.configure("TLabelframe.Label", font=("Microsoft YaHei UI", 11, "bold"))
 
+    def _build_menu(self):
+        menu_bar = tk.Menu(self)
+        tools = tk.Menu(menu_bar, tearoff=False)
+        tools.add_command(label="独立实时修改器（48 项）…", command=self.open_runtime_window)
+        tools.add_separator()
+        tools.add_command(label="所有帕鲁应用所选神仙词条", command=self.apply_preset_to_all)
+        tools.add_command(label="所有帕鲁应用当前四词条", command=self.apply_current_passives_to_all)
+        tools.add_separator()
+        tools.add_command(label="实验生成一只枯星龙…", command=self.add_experimental_world_tree_dragon)
+        menu_bar.add_cascade(label="工具", menu=tools)
+        self.configure(menu=menu_bar)
+
+    def open_runtime_window(self):
+        if self.runtime_window and self.runtime_window.winfo_exists():
+            self.runtime_window.lift()
+            self.runtime_window.focus_force()
+            return
+        self.runtime_window = RuntimeWindow(self)
+
     def _build_ui(self):
         header = ttk.Frame(self, padding=(18, 14, 18, 8))
         header.pack(fill="x")
         ttk.Label(header, text=APP_NAME, style="Title.TLabel").grid(row=0, column=0, sticky="w")
         ttk.Label(
             header,
-            text="Steam 1.0 · 编辑伙伴个体数据 · 保存前自动备份",
+            text="Steam 1.0 · 编辑伙伴属性、工作与被动词条 · 保存前自动备份",
             style="Sub.TLabel",
         ).grid(row=1, column=0, sticky="w", pady=(2, 0))
         header.columnconfigure(0, weight=1)
@@ -104,9 +141,9 @@ class App(tk.Tk):
         body.pack(fill="both", expand=True, padx=18, pady=(0, 10))
 
         left = ttk.Frame(body, padding=(0, 0, 10, 0))
-        right = ttk.Frame(body, padding=(10, 0, 0, 0))
+        right_shell = ttk.Frame(body, padding=(10, 0, 0, 0))
         body.add(left, weight=4)
-        body.add(right, weight=7)
+        body.add(right_shell, weight=7)
 
         player_row = ttk.Frame(left)
         player_row.pack(fill="x", pady=(0, 8))
@@ -133,6 +170,28 @@ class App(tk.Tk):
         self.tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         self.tree.bind("<<TreeviewSelect>>", self.on_pal_select)
+
+        self.editor_canvas = tk.Canvas(
+            right_shell,
+            background=self.cget("background"),
+            highlightthickness=0,
+            borderwidth=0,
+        )
+        editor_scrollbar = ttk.Scrollbar(right_shell, orient="vertical", command=self.editor_canvas.yview)
+        self.editor_canvas.configure(yscrollcommand=editor_scrollbar.set)
+        editor_scrollbar.pack(side="right", fill="y")
+        self.editor_canvas.pack(side="left", fill="both", expand=True)
+        right = ttk.Frame(self.editor_canvas, padding=(0, 0, 8, 8))
+        editor_window = self.editor_canvas.create_window((0, 0), window=right, anchor="nw")
+        right.bind(
+            "<Configure>",
+            lambda _event: self.editor_canvas.configure(scrollregion=self.editor_canvas.bbox("all")),
+        )
+        self.editor_canvas.bind(
+            "<Configure>",
+            lambda event: self.editor_canvas.itemconfigure(editor_window, width=event.width),
+        )
+        self.bind_all("<MouseWheel>", self._on_editor_mousewheel, add="+")
 
         ttk.Label(right, textvariable=self.info_var, font=("Microsoft YaHei UI", 14, "bold")).pack(fill="x")
         ttk.Label(right, textvariable=self.stat_var).pack(fill="x", pady=(3, 10))
@@ -173,6 +232,48 @@ class App(tk.Tk):
         for col in range(3):
             stats.columnconfigure(col, weight=1)
 
+        passives = ttk.Labelframe(right, text="当前伙伴的被动词条（独立编辑，最多 4 个）", padding=10)
+        passives.pack(fill="x", pady=(0, 10))
+        ttk.Label(
+            passives,
+            text="可输入中文名或内部 ID 搜索；同一只伙伴不能设置重复词条。",
+            foreground="#555555",
+        ).grid(row=0, column=0, columnspan=4, sticky="w", padx=4, pady=(0, 6))
+        for index, variable in enumerate(self.passive_vars):
+            row, col = divmod(index, 2)
+            box = ttk.Frame(passives)
+            box.grid(row=row + 1, column=col * 2, columnspan=2, sticky="ew", padx=5, pady=3)
+            ttk.Label(box, text=f"词条 {index + 1}", width=7).pack(side="left")
+            combo = ttk.Combobox(box, textvariable=variable, values=PASSIVE_CHOICES, state="normal")
+            combo.pack(side="left", fill="x", expand=True)
+            combo.bind("<KeyRelease>", lambda event, item=combo: self._filter_passive_choices(event, item))
+            combo.bind("<FocusIn>", lambda _event, item=combo: item.configure(values=PASSIVE_CHOICES))
+            combo.bind("<<ComboboxSelected>>", lambda _event: self._update_passive_description())
+            self.passive_combos.append(combo)
+        preset_row = ttk.Frame(passives)
+        preset_row.grid(row=3, column=0, columnspan=4, sticky="ew", padx=5, pady=(6, 2))
+        ttk.Label(preset_row, text="顶级预设：").pack(side="left")
+        self.passive_preset_combo = ttk.Combobox(
+            preset_row,
+            textvariable=self.passive_preset_var,
+            values=list(TOP_PASSIVE_PRESETS),
+            state="readonly",
+            width=16,
+        )
+        self.passive_preset_combo.pack(side="left")
+        ttk.Button(preset_row, text="一键应用到当前词条栏", command=self.apply_passive_preset).pack(
+            side="left", padx=(8, 0)
+        )
+        ttk.Button(preset_row, text="清空当前词条栏", command=self.clear_passives).pack(side="left", padx=(8, 0))
+        ttk.Label(
+            passives,
+            textvariable=self.passive_description_var,
+            foreground="#444444",
+            wraplength=700,
+        ).grid(row=4, column=0, columnspan=4, sticky="w", padx=5, pady=(4, 0))
+        for col in range(4):
+            passives.columnconfigure(col, weight=1)
+
         suits = ttk.Labelframe(right, text="该物种拥有的工作适应性（目标等级 1～10）", padding=10)
         self.suits_frame = suits
         suits.pack(fill="both", expand=True, pady=(0, 10))
@@ -201,6 +302,7 @@ class App(tk.Tk):
 
         presets = ttk.Frame(right)
         presets.pack(fill="x", pady=(0, 7))
+        ttk.Button(presets, text="当前伙伴满级（Lv.80）", command=self.max_current_level).pack(side="left")
         ttk.Button(presets, text="当前伙伴正常上限", command=self.max_combat).pack(side="left")
         ttk.Button(presets, text="当前伙伴超限最大（255）", command=self.max_overcap).pack(side="left", padx=(8, 0))
         ttk.Button(presets, text="当前伙伴已有工作设为 10", command=self.max_work).pack(side="left", padx=(8, 0))
@@ -216,6 +318,7 @@ class App(tk.Tk):
         actions = ttk.Frame(right)
         actions.pack(fill="x")
         ttk.Button(actions, text="一键：当前玩家全部帕鲁战斗/工作拉满", command=self.apply_all_max).pack(side="left")
+        ttk.Button(actions, text="所有帕鲁满级", command=self.max_all_levels).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="应用到当前伙伴", command=self.apply_current).pack(side="right")
         self.save_button = ttk.Button(actions, text="保存到存档", command=self.save_to_disk)
         self.save_button.pack(side="right", padx=(0, 8))
@@ -225,6 +328,17 @@ class App(tk.Tk):
         footer.pack(fill="x")
         ttk.Label(footer, textvariable=self.status_var).pack(side="left", fill="x", expand=True)
         ttk.Label(footer, text="请先退出游戏再保存").pack(side="right")
+
+    def _on_editor_mousewheel(self, event):
+        canvas = getattr(self, "editor_canvas", None)
+        if not canvas or not canvas.winfo_exists():
+            return
+        pointer_x, pointer_y = self.winfo_pointerxy()
+        left = canvas.winfo_rootx()
+        top = canvas.winfo_rooty()
+        if left <= pointer_x <= left + canvas.winfo_width() and top <= pointer_y <= top + canvas.winfo_height():
+            canvas.yview_scroll((-1 if event.delta > 0 else 1) * 3, "units")
+            return "break"
 
     def _update_running_label(self):
         running = palworld_running()
@@ -255,7 +369,6 @@ class App(tk.Tk):
                     exc, details = error
                     logging.getLogger("pal_partner_editor").error(details)
                     self.status_var.set(f"失败：{exc}")
-                    messagebox.showerror(APP_NAME, str(exc))
                 else:
                     callback(result)
         except queue.Empty:
@@ -265,7 +378,7 @@ class App(tk.Tk):
     def open_latest(self):
         saves = find_world_saves()
         if not saves:
-            messagebox.showerror(APP_NAME, "没有找到 Steam 的 Level.sav")
+            self.status_var.set("没有找到 Steam 的 Level.sav")
             return
         self.open_path(saves[0])
 
@@ -352,6 +465,10 @@ class App(tk.Tk):
         )
         for key in self.vars:
             self.vars[key].set(snap[key])
+        passives = list(snap.get("passives", []))
+        for index, variable in enumerate(self.passive_vars):
+            variable.set(passive_display(passives[index]) if index < len(passives) else PASSIVE_EMPTY_DISPLAY)
+        self._update_passive_description()
         self.advanced_var.set(bool(snap["overcap"]))
         self._toggle_advanced(sync_values=False)
         supported = [(key, values) for key, values in snap["suits"].items() if values["supported"]]
@@ -371,8 +488,113 @@ class App(tk.Tk):
         return {
             **{key: var.get() for key, var in self.vars.items()},
             "advanced": self.advanced_var.get(),
+            "passives": self._collect_passives(),
             "suits": {key: var.get() for key, var in self.suit_vars.items()},
         }
+
+    def _collect_passives(self):
+        result = []
+        name_matches: dict[str, list[str]] = {}
+        for code, data in PASSIVE_DATABASE.items():
+            name_matches.setdefault(data["name"].casefold(), []).append(code)
+        for variable in self.passive_vars:
+            text = variable.get().strip()
+            if not text or text == PASSIVE_EMPTY_DISPLAY:
+                continue
+            code = ""
+            if text.endswith("]") and "[" in text:
+                code = text.rsplit("[", 1)[1][:-1].strip()
+            elif text in PASSIVE_DATABASE:
+                code = text
+            else:
+                matches = name_matches.get(text.casefold(), [])
+                if len(matches) == 1:
+                    code = matches[0]
+            if not code:
+                raise EditorError(f"无法识别词条“{text}”，请从下拉搜索结果中选择")
+            result.append(code)
+        if len(result) != len(set(result)):
+            raise EditorError("同一只帕鲁不能设置重复词条")
+        return result
+
+    def _filter_passive_choices(self, event, combo):
+        if event.keysym in {"Up", "Down", "Left", "Right", "Return", "Escape", "Tab"}:
+            return
+        query = combo.get().strip().casefold()
+        if not query or query == PASSIVE_EMPTY_DISPLAY.casefold():
+            choices = PASSIVE_CHOICES
+        else:
+            choices = [
+                display
+                for display in PASSIVE_CHOICES
+                if query in display.casefold()
+                or (
+                    display.endswith("]")
+                    and display != PASSIVE_EMPTY_DISPLAY
+                    and query
+                    in PASSIVE_DATABASE.get(display.rsplit("[", 1)[1][:-1], {}).get("description", "").casefold()
+                )
+            ]
+        combo.configure(values=choices)
+        if choices:
+            combo.event_generate("<Down>")
+
+    def _update_passive_description(self):
+        details = []
+        for index, variable in enumerate(self.passive_vars, start=1):
+            text = variable.get().strip()
+            if not text or text == PASSIVE_EMPTY_DISPLAY or "[" not in text:
+                continue
+            code = text.rsplit("[", 1)[1][:-1]
+            data = PASSIVE_DATABASE.get(code)
+            if data:
+                details.append(f"{index}. {data['name']}：{data['description'] or '游戏未提供说明'}")
+        self.passive_description_var.set("　".join(details) if details else "选择词条后在这里显示效果说明。")
+
+    def apply_passive_preset(self):
+        codes = TOP_PASSIVE_PRESETS[self.passive_preset_var.get()]
+        for variable, code in zip(self.passive_vars, codes):
+            variable.set(passive_display(code))
+        self._update_passive_description()
+        self.status_var.set("已填入当前伙伴的顶级词条预设；点击“应用到当前伙伴”后再保存。")
+
+    def clear_passives(self):
+        for variable in self.passive_vars:
+            variable.set(PASSIVE_EMPTY_DISPLAY)
+        self._update_passive_description()
+
+    def apply_preset_to_all(self):
+        preset_name = self.passive_preset_var.get()
+        self._confirm_passives_for_all(list(TOP_PASSIVE_PRESETS[preset_name]), preset_name)
+
+    def apply_current_passives_to_all(self):
+        try:
+            passives = self._collect_passives()
+        except EditorError as exc:
+            self.status_var.set(str(exc))
+            return
+        names = "、".join(PASSIVE_DATABASE.get(code, {}).get("name", code) for code in passives) or "清空全部词条"
+        self._confirm_passives_for_all(passives, names)
+
+    def _confirm_passives_for_all(self, passives, label):
+        if not self.session:
+            self.status_var.set("请先加载存档")
+            return
+        index = max(self.player_combo.current(), 0)
+        pals = self.session.pals_for_player(index)
+        if not pals:
+            self.status_var.set("当前玩家没有可编辑的伙伴")
+            return
+        self._run_worker(
+            "正在批量写入所有伙伴的神仙词条…",
+            lambda: (self.session.apply_passives_all(index, passives), label),
+            self._all_passives_applied,
+        )
+
+    def _all_passives_applied(self, result):
+        count, label = result
+        self.refresh_pal_list()
+        self.status_var.set(f"已将 {count} 只伙伴套用“{label}”；还需要保存到存档。")
 
     @staticmethod
     def _star_text(snap):
@@ -438,21 +660,42 @@ class App(tk.Tk):
             if values["supported"]:
                 self.suit_vars[key].set(10)
 
+    def max_current_level(self):
+        if not self.session or not self.current_pal:
+            self.status_var.set("请先选择伙伴")
+            return
+        snap = self.session.max_level(self.current_pal)
+        self._display_snapshot(snap)
+        current = self.tree.selection()
+        if current:
+            self.tree.set(current[0], "level", snap["level"])
+        self.status_var.set(f"已将 {snap['name']} 设为 Lv.80；还需要点击“保存到存档”。")
+
+    def max_all_levels(self):
+        if not self.session:
+            return
+        index = max(self.player_combo.current(), 0)
+        pals = self.session.pals_for_player(index)
+        if not pals:
+            self.status_var.set("当前玩家没有可编辑的伙伴")
+            return
+        self._run_worker(
+            "正在将所有伙伴设为满级…",
+            lambda: self.session.max_level_all(index),
+            self._all_levels_maxed,
+        )
+
+    def _all_levels_maxed(self, count):
+        self.refresh_pal_list()
+        self.status_var.set(f"已在内存中将 {count} 只伙伴设为 Lv.80；还需要保存到存档。")
+
     def add_all_missing(self):
         if not self.session:
             return
         index = max(self.player_combo.current(), 0)
         missing = self.session.missing_obtainable_species(index)
         if not missing:
-            messagebox.showinfo(APP_NAME, "当前玩家已经拥有全部可获得帕鲁种类。")
-            return
-        if not messagebox.askyesno(
-            APP_NAME,
-            f"将向当前玩家的帕鲁终端补入 {len(missing)} 种尚未拥有的帕鲁，每种 1 只。\n\n"
-            "只补正常可获得的物种/亚种，不加入塔主、NPC、测试体或随行剧情别名。\n"
-            "新增伙伴为 1 级、无被动和主动技能；修改仍需点击“保存到存档”才会写入。\n\n"
-            "是否继续？",
-        ):
+            self.status_var.set("当前玩家已经拥有全部可获得帕鲁种类")
             return
         self._run_worker(
             "正在补齐尚未拥有的帕鲁…",
@@ -463,11 +706,21 @@ class App(tk.Tk):
     def _all_missing_added(self, names):
         self.refresh_pal_list()
         self.status_var.set(f"已在内存中新增 {len(names)} 种帕鲁；还需要保存到存档。")
-        messagebox.showinfo(
-            APP_NAME,
-            f"已补入 {len(names)} 种尚未拥有的帕鲁。\n\n"
-            "它们已放入当前玩家的帕鲁终端；请退出游戏后点击“保存到存档”。",
+
+    def add_experimental_world_tree_dragon(self):
+        if not self.session:
+            self.status_var.set("请先加载存档")
+            return
+        index = max(self.player_combo.current(), 0)
+        self._run_worker(
+            "正在生成实验枯星龙…",
+            lambda: self.session.add_experimental_world_tree_dragon(index),
+            self._experimental_pal_added,
         )
+
+    def _experimental_pal_added(self, name):
+        self.refresh_pal_list()
+        self.status_var.set(f"已在内存中生成实验伙伴{name}；还需要保存到存档。")
 
     def apply_all_max(self):
         if not self.session:
@@ -475,14 +728,7 @@ class App(tk.Tk):
         index = max(self.player_combo.current(), 0)
         pals = self.session.pals_for_player(index)
         if not pals:
-            messagebox.showinfo(APP_NAME, "当前玩家没有可编辑的伙伴")
-            return
-        if not messagebox.askyesno(
-            APP_NAME,
-            f"将当前玩家的 {len(pals)} 只伙伴全部设为超限最大？\n\n"
-            "IV、生命/攻防/工作速度强化设为 255，浓缩等级设为 254；"
-            "每只伙伴已有的工作适应性设为 10。\n\n修改先保存在内存中，仍需点击“保存到存档”。",
-        ):
+            self.status_var.set("当前玩家没有可编辑的伙伴")
             return
         self._run_worker(
             "正在批量应用全部伙伴的超限属性…",
@@ -493,11 +739,10 @@ class App(tk.Tk):
     def _all_max_applied(self, count):
         self.refresh_pal_list()
         self.status_var.set(f"已在内存中将 {count} 只伙伴的战斗和工作属性拉满；还需要保存到存档。")
-        messagebox.showinfo(APP_NAME, f"已批量应用 {count} 只伙伴。\n\n请退出游戏后点击“保存到存档”。")
 
     def apply_current(self):
         if not self.session or not self.current_pal:
-            messagebox.showwarning(APP_NAME, "请先选择伙伴")
+            self.status_var.set("请先选择伙伴")
             return
         try:
             snap = self.session.apply(self.current_pal, self._collect_values())
@@ -507,30 +752,24 @@ class App(tk.Tk):
             if current:
                 self.tree.set(current[0], "stars", self._star_text(snap))
         except EditorError as exc:
-            messagebox.showerror(APP_NAME, str(exc))
+            self.status_var.set(str(exc))
 
     def save_to_disk(self):
         if not self.session:
             return
-        if self.current_pal and messagebox.askyesno(APP_NAME, "是否先把当前界面的数值应用到所选伙伴，再保存？"):
+        if self.current_pal:
             try:
                 self.session.apply(self.current_pal, self._collect_values())
             except EditorError as exc:
-                messagebox.showerror(APP_NAME, str(exc))
+                self.status_var.set(str(exc))
                 return
         if not self.session.dirty:
-            messagebox.showinfo(APP_NAME, "没有已应用的修改")
-            return
-        if not messagebox.askyesno(
-            APP_NAME,
-            "确认写入 Level.sav？\n\n程序会先在世界目录创建带时间戳的备份，并回读验证临时存档。",
-        ):
+            self.status_var.set("没有已应用的修改")
             return
         self._run_worker("正在备份、写入并回读验证…", self.session.save, self._saved)
 
     def _saved(self, backup_dir: Path):
         self.status_var.set(f"保存成功；备份位于 {backup_dir}")
-        messagebox.showinfo(APP_NAME, f"保存成功。\n\n备份目录：\n{backup_dir}")
 
     def on_close(self):
         if self.session and self.session.dirty:
