@@ -96,16 +96,9 @@ class AsyncHotkeyPoller:
                 self.owner.after(60, self._poll)
 
 
-class TrainerWindow(tk.Toplevel):
+class TrainerPanel(ttk.Frame):
     def __init__(self, master):
         super().__init__(master)
-        self.title("帕鲁伙伴编辑器 · 独立实时修改器（48 项）")
-        self.geometry("1220x820")
-        self.minsize(980, 680)
-        try:
-            self.iconbitmap(master.resource_path("app.ico"))
-        except tk.TclError:
-            pass
         self.session = LiveTrainerSession()
         self.status_var = tk.StringVar(value="未连接：请先进入本地单人存档")
         self.hotkey_var = tk.StringVar(value="全局快捷键：已启用")
@@ -123,7 +116,6 @@ class TrainerWindow(tk.Toplevel):
         self._build()
         self.hotkeys = AsyncHotkeyPoller(self, self._hotkey_triggered)
         self.hotkeys.start()
-        self.protocol("WM_DELETE_WINDOW", self._close)
         self.after(400, self._refresh_status)
 
     def _build(self):
@@ -131,7 +123,7 @@ class TrainerWindow(tk.Toplevel):
         header.pack(fill="x")
         ttk.Label(
             header,
-            text="独立实时修改器",
+            text="实时修改器",
             font=("Microsoft YaHei UI", 19, "bold"),
         ).grid(row=0, column=0, sticky="w")
         ttk.Label(
@@ -420,12 +412,13 @@ class TrainerWindow(tk.Toplevel):
             )
         self.after(400, self._refresh_status)
 
-    def _close(self):
+    def shutdown(self):
         self._closed = True
+        self.hotkeys.enabled = False
         try:
             self.session.disconnect()
-        finally:
-            self.destroy()
+        except Exception:
+            pass
 
 
-RuntimeWindow = TrainerWindow
+RuntimePanel = TrainerPanel

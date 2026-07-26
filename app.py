@@ -21,11 +21,11 @@ from backend import (
     palworld_running,
     passive_display,
 )
-from trainer_window import RuntimeWindow
+from trainer_window import RuntimePanel
 
 
 APP_NAME = "帕鲁伙伴编辑器"
-APP_VERSION = "1.6.4"
+APP_VERSION = "1.7.0"
 
 
 class App(tk.Tk):
@@ -72,7 +72,7 @@ class App(tk.Tk):
         self.passive_combos: list[ttk.Combobox] = []
         self.passive_description_var = tk.StringVar(value="选择词条后在这里显示效果说明。")
         self.passive_preset_var = tk.StringVar(value="神仙全能")
-        self.runtime_window = None
+        self.runtime_panel = None
 
         self._configure_style()
         self._build_menu()
@@ -99,9 +99,17 @@ class App(tk.Tk):
 
     def _build_menu(self):
         menu_bar = tk.Menu(self)
+        pages = tk.Menu(menu_bar, tearoff=False)
+        pages.add_command(
+            label="伙伴编辑器",
+            command=lambda: self._show_page(0),
+        )
+        pages.add_command(
+            label="实时修改器（48 项）",
+            command=lambda: self._show_page(1),
+        )
+        menu_bar.add_cascade(label="页面", menu=pages)
         tools = tk.Menu(menu_bar, tearoff=False)
-        tools.add_command(label="独立实时修改器（48 项）…", command=self.open_runtime_window)
-        tools.add_separator()
         tools.add_command(label="所有帕鲁应用所选神仙词条", command=self.apply_preset_to_all)
         tools.add_command(label="所有帕鲁应用当前四词条", command=self.apply_current_passives_to_all)
         tools.add_separator()
@@ -109,15 +117,17 @@ class App(tk.Tk):
         menu_bar.add_cascade(label="工具", menu=tools)
         self.configure(menu=menu_bar)
 
-    def open_runtime_window(self):
-        if self.runtime_window and self.runtime_window.winfo_exists():
-            self.runtime_window.lift()
-            self.runtime_window.focus_force()
-            return
-        self.runtime_window = RuntimeWindow(self)
+    def _show_page(self, index: int):
+        if hasattr(self, "page_book"):
+            self.page_book.select(index)
 
     def _build_ui(self):
-        header = ttk.Frame(self, padding=(18, 14, 18, 8))
+        self.page_book = ttk.Notebook(self)
+        self.page_book.pack(fill="both", expand=True)
+        self.partner_page = ttk.Frame(self.page_book)
+        self.page_book.add(self.partner_page, text="伙伴编辑器")
+
+        header = ttk.Frame(self.partner_page, padding=(18, 14, 18, 8))
         header.pack(fill="x")
         ttk.Label(header, text=APP_NAME, style="Title.TLabel").grid(row=0, column=0, sticky="w")
         ttk.Label(
@@ -130,14 +140,14 @@ class App(tk.Tk):
         self.running_label.grid(row=0, column=1, rowspan=2, sticky="e")
         self._update_running_label()
 
-        filebar = ttk.Frame(self, padding=(18, 4, 18, 10))
+        filebar = ttk.Frame(self.partner_page, padding=(18, 4, 18, 10))
         filebar.pack(fill="x")
         ttk.Entry(filebar, textvariable=self.path_var, state="readonly").pack(side="left", fill="x", expand=True)
         ttk.Button(filebar, text="最近存档", command=self.open_latest).pack(side="left", padx=(8, 0))
         ttk.Button(filebar, text="选择 Level.sav", command=self.choose_save).pack(side="left", padx=(8, 0))
         ttk.Button(filebar, text="重新加载", command=self.reload).pack(side="left", padx=(8, 0))
 
-        body = ttk.Panedwindow(self, orient="horizontal")
+        body = ttk.Panedwindow(self.partner_page, orient="horizontal")
         body.pack(fill="both", expand=True, padx=18, pady=(0, 10))
 
         left = ttk.Frame(body, padding=(0, 0, 10, 0))
@@ -324,10 +334,16 @@ class App(tk.Tk):
         self.save_button.pack(side="right", padx=(0, 8))
         self._toggle_advanced(sync_values=False)
 
-        footer = ttk.Frame(self, padding=(18, 8, 18, 12))
+        footer = ttk.Frame(self.partner_page, padding=(18, 8, 18, 12))
         footer.pack(fill="x")
         ttk.Label(footer, textvariable=self.status_var).pack(side="left", fill="x", expand=True)
         ttk.Label(footer, text="请先退出游戏再保存").pack(side="right")
+
+        self.runtime_panel = RuntimePanel(self.page_book)
+        self.page_book.add(
+            self.runtime_panel,
+            text="实时修改器（48 项）",
+        )
 
     def _on_editor_mousewheel(self, event):
         canvas = getattr(self, "editor_canvas", None)
@@ -775,6 +791,8 @@ class App(tk.Tk):
         if self.session and self.session.dirty:
             if not messagebox.askyesno(APP_NAME, "还有未保存的修改，确定退出吗？"):
                 return
+        if self.runtime_panel:
+            self.runtime_panel.shutdown()
         self.destroy()
 
 
