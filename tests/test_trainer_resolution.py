@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from trainer_runtime import (
     _first_call_target_with_prefix,
+    _is_build_material_copy_constructor,
     _resolve_stealth_branch,
 )
 
@@ -56,6 +57,31 @@ class TrainerResolutionTests(unittest.TestCase):
                 search_size=0x20,
             ),
             0,
+        )
+
+    def test_build_material_hook_uses_copy_constructor(self):
+        process = FakeProcess()
+        address = process.base + 0x2900
+        process.write_bytes(
+            address - 0x9A,
+            bytes.fromhex(
+                "48 8D 05 11 22 33 44 "
+                "48 89 01 48 8B 42 08 48 89 41 08"
+            ),
+        )
+        self.assertTrue(
+            _is_build_material_copy_constructor(process, address)
+        )
+
+    def test_plain_row_copy_is_not_build_material_target(self):
+        process = FakeProcess()
+        address = process.base + 0x2900
+        process.write_bytes(
+            address - 0x90,
+            bytes.fromhex("48 8B 42 08 48 89 41 08"),
+        )
+        self.assertFalse(
+            _is_build_material_copy_constructor(process, address)
         )
 
     def test_sight_check_resolves_cone_rejection_branch(self):

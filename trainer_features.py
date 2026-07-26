@@ -1,5 +1,3 @@
-"""Feature contract for the clean-room 48-option real-time trainer."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

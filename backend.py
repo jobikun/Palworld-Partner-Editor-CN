@@ -95,7 +95,7 @@ def _load_pal_database() -> dict[str, dict[str, Any]]:
         code = pal.get("InternalName")
         if code:
             result[str(code)] = pal
-    # 剧情随行形态沿用对应物种的名称和基础数据。
+
     if "KingWhale" in result:
         result["KingWhale_otomo"] = result["KingWhale"]
     return result
@@ -104,8 +104,8 @@ def _load_pal_database() -> dict[str, dict[str, Any]]:
 PAL_DATABASE: dict[str, dict[str, Any]] = {}
 PAL_CODE_CASEFOLD: dict[str, str] = {}
 EXPERIMENTAL_SPECIES: dict[str, dict[str, Any]] = {
-    # PalworldSaveTools 2.1.9 identifies this story boss as Astralym.
-    # It has no partner skill, work suitability, run speed, or ride speed.
+
+
     "WorldTreeDragon": {
         "Name": "Astralym",
         "LocalizedNames": {"zh-Hans": "枯星龙"},
@@ -225,7 +225,7 @@ def _skip_decode(reader: FArchiveReader, type_name: str, size: int, path: str):
 
 
 def _skip_encode(writer: FArchiveWriter, property_type: str, properties: dict) -> int:
-    # PalEdit 原实现会删除传入字典中的辅助键；这里复制后再处理，确保重复保存安全。
+
     props = dict(properties)
     if "skip_type" not in props:
         custom_type = props.get("custom_type")
@@ -254,7 +254,7 @@ def _skip_encode(writer: FArchiveWriter, property_type: str, properties: dict) -
 
 
 def _group_prefix_decode(reader: FArchiveReader, type_name: str, size: int, path: str):
-    """Decode only the stable group prefix and preserve every newer tail byte."""
+
     if type_name != "MapProperty":
         raise EditorError(f"公会数据类型异常: {type_name}")
     value = reader.property(type_name, size, path, nested_caller_path=path)
@@ -297,9 +297,8 @@ for _path in (
     ".worldSaveData.MapObjectSpawnerInStageSaveData",
     ".worldSaveData.DynamicItemSaveData",
     ".worldSaveData.ItemContainerSaveData",
-    # Palworld 1.0 added Progress_MultiType work records that older decoders
-    # cannot interpret. Partner editing never needs this array, so preserve it
-    # byte-for-byte instead of risking a lossy decode/re-encode cycle.
+
+
     ".worldSaveData.WorkSaveData",
 ):
     CUSTOM_PROPERTIES[_path] = (_skip_decode, _skip_encode)
@@ -338,7 +337,7 @@ class PalRecord:
 
 
 class PartnerEntity:
-    """Minimal, side-effect-free view of the partner fields we edit."""
+
 
     def __init__(self, data: dict):
         self._data = data
@@ -882,9 +881,8 @@ class SaveSession:
 
     def missing_obtainable_species(self, player_index: int) -> list[str]:
         owned = {pal.code_name for pal in self.pals_for_player(player_index)}
-        # PalCalc's 1.0 database contains regular obtainable Pal species and
-        # variants. Runtime-only follower aliases are added separately and are
-        # deliberately not candidates here.
+
+
         return sorted(
             (
                 code
@@ -1017,8 +1015,7 @@ class SaveSession:
         entity.SetPassives(list(TOP_PASSIVE_PRESETS["神仙战神"]))
         record = PalRecord(entity, str(instance_id), player.storage_container)
 
-        # Commit all related records only after the entity has been fully built.
-        # A malformed clone template must never leave an orphaned terminal slot.
+
         slots.append(new_slot)
         entities.append(item)
         handles.append({"guid": empty_uid, "instance_id": instance_id})
@@ -1132,7 +1129,7 @@ class SaveSession:
             encoding="utf-8",
         )
 
-        # Preserve the exact compression/save type used by the source file.
+
         payload = compress_gvas_to_sav(self.gvas.write(CUSTOM_PROPERTIES), self.save_type)
         fd, temp_name = tempfile.mkstemp(prefix=".partner-editor-", suffix=".sav.tmp", dir=self.level_path.parent)
         temp_path = Path(temp_name)

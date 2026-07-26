@@ -5,12 +5,12 @@
 ## 下载
 
 无需 Python 的 Windows 独立版请从 GitHub 仓库右侧的 **Releases** 下载。
-源码构建方法见 `BUILD.md`；`release/` 中保留的是首次发布的 v1.3.0 包。
+源码构建方法见 `BUILD.md`。
 
 ## 自动打包发布
 
 1. 修改源码。
-2. 同步修改 `app.py` 中的 `APP_VERSION`，例如从 `1.6.1` 改为 `1.6.2`。
+2. 同步修改 `app.py` 中的 `APP_VERSION`。
 3. 使用 GitHub Desktop 提交并推送到 `main`。
 4. GitHub Actions 会自动检查源码、构建 Windows EXE、生成 ZIP 和 SHA256，并创建对应版本的 Release。
 
@@ -41,8 +41,6 @@
 ## 独立实时修改器（48 项）
 
 “工具 → 独立实时修改器（48 项）”会打开另一个浅色窗口，原伙伴存档编辑界面不变。
-实时内核、UE5 反射解析、补丁恢复和界面均由本项目自行编写；不会包含、启动、嵌入或
-调用第三方修改器，也不再要求安装 UE4SS。
 
 使用时先进入本地单人世界，再点击“连接当前单人世界”。程序会校验当前
 `Palworld-Win64-Shipping.exe` 的完整 SHA256，动态解析 UE5 对象和属性偏移，

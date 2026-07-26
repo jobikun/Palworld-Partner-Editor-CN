@@ -33,7 +33,7 @@ class UnrealReflectionTests(unittest.TestCase):
         block = 0x20000
         process.put(pool + 0x10, struct.pack("<Q", block))
 
-        # FName entry offsets are measured in 2-byte units.
+
         process.put(block + 2, struct.pack("<H", 4 << 6) + b"Test")
         wide_index = 4
         wide_text = "中文"

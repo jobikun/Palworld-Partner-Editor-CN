@@ -4,9 +4,14 @@ __pycache__/
 .venv/
 build/
 dist/
+release/
+runtime_mod/
 testdata/
 *.sav
 *.sav.tmp
+*.log
 PalPartnerEditor_Backups/
+.pytest_cache/
+.mypy_cache/
 .idea/
 .vscode/

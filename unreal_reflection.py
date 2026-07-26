@@ -1,10 +1,3 @@
-"""Read-only Unreal Engine 5 reflection support for the live trainer.
-
-The resolver deliberately discovers the object array, name pool, classes and
-property offsets from the running game.  No address in this module is copied
-from a third-party trainer, and no game memory is changed here.
-"""
-
 from __future__ import annotations
 
 import struct
@@ -21,8 +14,6 @@ from memory_trainer import (
 )
 
 
-# UE5.1 layouts used by the current Palworld build.  The addresses of the
-# structures themselves are still resolved dynamically for every process.
 UOBJECT_CLASS_PRIVATE = 0x10
 UOBJECT_NAME_PRIVATE = 0x18
 UOBJECT_OUTER_PRIVATE = 0x20
@@ -81,7 +72,7 @@ def _u64(data: bytes, offset: int = 0) -> int:
 
 
 def resolve_rip_target(process: ProcessMemory, displacement_address: int) -> int:
-    """Resolve a disp32 whose base is the byte immediately after the operand."""
+
 
     displacement = _i32(process.read(displacement_address, 4))
     return displacement_address + 4 + displacement
@@ -112,7 +103,7 @@ class ReflectedProperty:
 
 
 def resolve_unreal_core(process: ProcessMemory) -> UnrealCoreAddresses:
-    """Resolve and validate the two UE global registries without writing memory."""
+
 
     guobject_match = process.scan_unique(GUOBJECT_ARRAY_PATTERN)
     guobject_array = resolve_rip_target(
@@ -166,7 +157,7 @@ def resolve_unreal_core(process: ProcessMemory) -> UnrealCoreAddresses:
 
 
 class UnrealReflection:
-    """Small external UE5 reflection reader tailored to property discovery."""
+
 
     def __init__(
         self,
@@ -273,9 +264,8 @@ class UnrealReflection:
 
     def iter_objects(self, *, limit: int | None = None) -> Iterator[UnrealObject]:
         for index, address in self.iter_object_addresses(limit=limit):
-            # Objects can be destroyed between reading GUObjectArray and
-            # reading the UObject itself.  A transient stale slot must not
-            # abort the complete reflection pass while the world is active.
+
+
             try:
                 data = self.process.read(address + UOBJECT_CLASS_PRIVATE, 0x18)
             except MemoryReadError:
@@ -340,7 +330,7 @@ class UnrealReflection:
         ]
         if not matches:
             raise TrainerError(f"没有在 UE 对象表中找到结构：{struct_name}")
-        # Native UClass/UScriptStruct is preferred over generated blueprints.
+
         priority = {"Class": 0, "ScriptStruct": 1, "BlueprintGeneratedClass": 2}
         result = min(matches, key=lambda item: priority.get(item[1], 99))[0]
         self._struct_cache[cache_key] = result

@@ -1,11 +1,3 @@
-"""Live Palworld 1.0 trainer session.
-
-This module is self-contained and never loads, starts or communicates with a
-third-party trainer.  It uses the project's process-memory and UE reflection
-layers, keeps every original value needed for restoration, and performs all
-continuous writes on one guarded worker thread.
-"""
-
 from __future__ import annotations
 
 import struct
@@ -94,7 +86,7 @@ def _filter_owned_pals(
     owner_uid_offset: int,
     player_uid: bytes,
 ) -> list[PalTarget]:
-    """Keep only active Pal actors owned by the current local player."""
+
 
     if len(player_uid) != 16 or not any(player_uid):
         return []
@@ -123,7 +115,7 @@ def _first_call_target_with_prefix(
     *,
     search_size: int,
 ) -> int:
-    """Find a direct call in a reflected UFunction wrapper by callee prologue."""
+
 
     if not wrapper:
         return 0
@@ -145,12 +137,31 @@ def _first_call_target_with_prefix(
     return 0
 
 
+def _is_build_material_copy_constructor(
+    process: ProcessMemory,
+    address: int,
+) -> bool:
+    try:
+        return (
+            process.read(address - 0x9A, 3)
+            == bytes.fromhex("48 8D 05")
+            and process.read(address - 0x93, 11)
+            == bytes.fromhex(
+                "48 89 01 48 8B 42 08 48 89 41 08"
+            )
+            and process.read(address - 0x90, 8)
+            == bytes.fromhex("48 8B 42 08 48 89 41 08")
+        )
+    except MemoryReadError:
+        return False
+
+
 def _resolve_stealth_branch(
     process: ProcessMemory,
     sight_check_native: int,
     cone_check_native: int,
 ) -> int:
-    """Locate SightCheckAllPlayer's cone-result rejection branch."""
+
 
     if not sight_check_native or not cone_check_native:
         return 0
@@ -388,7 +399,7 @@ class TargetLocator:
 
 
 class PointerCaptureHook:
-    """A tiny semantic-preserving hook that records RAX in a private data slot."""
+
 
     def __init__(
         self,
@@ -409,10 +420,10 @@ class PointerCaptureHook:
         self.cave = transaction.allocate(0x1000, near=hook_address)
         self.pointer_address = self.cave + 0x200
         code = bytearray()
-        code += b"\x52"  # push rdx
+        code += b"\x52"
         code += b"\x48\xBA" + struct.pack("<Q", self.pointer_address)
-        code += b"\x48\x89\x02"  # mov [rdx],rax
-        code += b"\x5A"  # pop rdx
+        code += b"\x48\x89\x02"
+        code += b"\x5A"
         code += self.original_bytes
         code += relative_jump(
             self.cave + len(code),
@@ -435,7 +446,7 @@ class PointerCaptureHook:
 
 
 class LiveTrainerSession:
-    """Stateful controller used by the real-time trainer window."""
+
 
     OPTION_CAPTURE_PATTERN = AobPattern.parse(
         "F3 0F 10 40 ?? EB ?? E8 ?? ?? ?? ?? "
@@ -525,9 +536,8 @@ class LiveTrainerSession:
                         "检测到当前世界为多人/服务器模式。"
                         "实时修改器仅允许本机单人存档，已拒绝写入。"
                     )
-                # The pointer has been captured and remains valid for this
-                # loaded world.  Restore the hook immediately instead of
-                # leaving an always-executing JMP installed during play.
+
+
                 option_hook.patch.disable(process)
                 self._option_pointer = option_pointer
                 self._prepare_simple_patches()
@@ -878,8 +888,6 @@ class LiveTrainerSession:
             self._simple_patches[feature_id] = [patch]
 
     def _register_build_material_hook(self):
-        """Zero the copied PalBuildObjectData material counters."""
-
         assert self.process and self.transaction and self.offsets
         matches = self.process.scan(
             AobPattern.parse(
@@ -887,20 +895,14 @@ class LiveTrainerSession:
                 "0F B6 42 7C 88 41 7C"
             )
         )
-        candidates = []
-        for address in matches:
-            # The current build also contains a copy constructor with the
-            # same tail.  FindRow uses the plain assignment helper whose
-            # first copy instruction is exactly 0x90 bytes earlier.
-            try:
-                if (
-                    self.process.read(address - 0x99, 9) == b"\xCC" * 9
-                    and self.process.read(address - 0x90, 8)
-                    == bytes.fromhex("48 8B 42 08 48 89 41 08")
-                ):
-                    candidates.append(address)
-            except MemoryReadError:
-                continue
+        candidates = [
+            address
+            for address in matches
+            if _is_build_material_copy_constructor(
+                self.process,
+                address,
+            )
+        ]
         if len(candidates) != 1:
             return
         address = candidates[0]
@@ -940,7 +942,7 @@ class LiveTrainerSession:
         unlimited = cave + 0x200
         multiplier = cave + 0x208
         maximum = cave + 0x210
-        code = bytearray(b"\x9C")  # pushfq; original instructions preserve flags
+        code = bytearray(b"\x9C")
         code += bytes.fromhex("F3 0F 5A C6")
 
         def rip(opcode: bytes, target: int, *, trailing: int = 0):
@@ -971,7 +973,7 @@ class LiveTrainerSession:
             jmp_at + 1,
             (cave + done_label) - (cave + jmp_at + 5),
         )
-        code += b"\x9D"  # popfq
+        code += b"\x9D"
         code += relative_jump(cave + len(code), address + len(original))
         self.process.write(cave, code, executable=True)
         self.process.write(unlimited, struct.pack("<i", 0))
@@ -1189,11 +1191,7 @@ class LiveTrainerSession:
                 save + o.save_hp + o.fixed_point_value,
                 int(lock_hp.value) * 1000,
             )
-        # Player MaxHP may legitimately be zero because the live maximum is
-        # calculated by the game from level/status modifiers.  God mode is
-        # therefore implemented only through the incoming-damage world
-        # setting below; copying SaveParameter.MaxHP into Hp could set Hp to
-        # zero on an otherwise healthy player.
+
 
         if self._state("infinite_shield").enabled:
             maximum = self.process.read(

@@ -80,10 +80,6 @@ jobs:
           )) {
             if (Test-Path -LiteralPath $file) { Copy-Item -LiteralPath $file -Destination $folder }
           }
-          $testNote = Join-Path $PWD "测试说明_v$version.txt"
-          if (Test-Path -LiteralPath $testNote) {
-            Copy-Item -LiteralPath $testNote -Destination $folder
-          }
           foreach ($file in @(
             "app.py",
             "backend.py",

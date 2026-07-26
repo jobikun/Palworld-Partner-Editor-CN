@@ -1,11 +1,3 @@
-"""Self-contained Windows process-memory engine for the Palworld trainer.
-
-This module is independently implemented.  It does not load or call any
-third-party trainer.  The public classes deliberately separate read-only
-discovery/scanning from write access so that signatures can be validated
-before a patch is ever applied.
-"""
-
 from __future__ import annotations
 
 import ctypes
@@ -58,7 +50,7 @@ MAX_PATH = 260
 
 
 class TrainerError(RuntimeError):
-    """Base exception presented to the trainer UI."""
+    pass
 
 
 class ProcessNotFoundError(TrainerError):
@@ -295,7 +287,7 @@ class AobPattern:
 
 
 class WindowsApi:
-    """Typed kernel32 bindings, initialized lazily for testability."""
+
 
     def __init__(self):
         if os.name != "nt":
@@ -447,7 +439,7 @@ class ProcessMemory:
         code = wintypes.DWORD()
         if not self.api.kernel32.GetExitCodeProcess(self.handle, ctypes.byref(code)):
             return False
-        return code.value == 259  # STILL_ACTIVE
+        return code.value == 259
 
     def modules(self) -> list[ModuleInfo]:
         self._require_open()
@@ -504,7 +496,7 @@ class ProcessMemory:
         return bytes(buffer)
 
     def read_u64(self, address: int) -> int:
-        """Read one little-endian unsigned 64-bit value from the game."""
+
         return struct.unpack("<Q", self.read(address, 8))[0]
 
     def write(self, address: int, data: bytes, *, executable: bool = False):
@@ -789,11 +781,8 @@ class PatchTransaction:
                 time.sleep(0.05)
 
             self._patches = [patch for patch in self._patches if patch.enabled]
-            # Never release a remote code cave while the game is running.  A
-            # worker can already have fetched the JMP just before its entry
-            # bytes are restored; freeing the page then creates a rare use-
-            # after-free crash.  These allocations are tiny and Windows
-            # reclaims them automatically when Palworld exits.
+
+
             self._allocations.clear()
         return errors
 

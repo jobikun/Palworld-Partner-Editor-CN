@@ -25,8 +25,8 @@ class PalworldOffsetsTests(unittest.TestCase):
         flat_values = []
         for value in values.values():
             flat_values.extend(value if isinstance(value, tuple) else (value,))
-        # Five recipe counters are grouped in one tuple and the private money
-        # member is recovered from GetNowMoney rather than a reflected property.
+
+
         self.assertEqual(len(flat_values), len(reflection.calls) + 1)
         self.assertTrue(all(value > 0 and value % 4 == 0 for value in flat_values))
         self.assertIn(

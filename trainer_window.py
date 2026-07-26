@@ -1,5 +1,3 @@
-"""Tk interface for the independent 48-option live trainer."""
-
 from __future__ import annotations
 
 import ctypes
@@ -77,7 +75,7 @@ class AsyncHotkeyPoller:
             disable_combo = (
                 self._is_down(MODIFIERS["CTRL"])
                 and self._is_down(MODIFIERS["SHIFT"])
-                and self._is_down(0x24)  # Home
+                and self._is_down(0x24)
             )
             if disable_combo and "__master__" not in self._pressed:
                 self.enabled = not self.enabled

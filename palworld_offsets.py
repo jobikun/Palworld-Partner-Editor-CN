@@ -1,9 +1,3 @@
-"""Dynamically reflected Palworld 1.0 member offsets.
-
-Names are stable Unreal reflection identifiers.  Numeric offsets are never
-stored in a version profile; they are resolved from the running process.
-"""
-
 from __future__ import annotations
 
 import struct
@@ -260,7 +254,7 @@ class PalworldOffsets:
 
 
 def _resolve_money_value_offset(reflection: UnrealReflection) -> int:
-    """Derive PalMoneyData's private value member from GetNowMoney."""
+
 
     process = reflection.process
     for obj in reflection.iter_objects():
