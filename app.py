@@ -25,7 +25,7 @@ from trainer_window import RuntimeWindow
 
 
 APP_NAME = "帕鲁伙伴编辑器"
-APP_VERSION = "1.6.3"
+APP_VERSION = "1.6.4"
 
 
 class App(tk.Tk):

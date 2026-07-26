@@ -53,6 +53,20 @@ class PalTarget:
 
 
 @dataclass(frozen=True)
+class OverheatWeaponLayout:
+    base_class: int
+    meta_classes: tuple[int, ...]
+    weapon_classes: tuple[int, ...]
+    instances: tuple[int, ...]
+    heat_value: int
+    heat_per_shot: int
+    cooling_speed: int
+    is_overheated: int
+    displayed_heat: int
+    is_in_cool_time: int
+
+
+@dataclass(frozen=True)
 class LiveTargets:
     player: int
     player_component: int
@@ -72,6 +86,7 @@ class LiveTargets:
     world: int
     world_settings: int
     stealth_branch: int
+    overheat_weapon: OverheatWeaponLayout | None
     pals: tuple[PalTarget, ...] = field(default_factory=tuple)
     all_pals: tuple[PalTarget, ...] = field(default_factory=tuple)
 
@@ -236,6 +251,49 @@ class TargetLocator:
         )
         item_container_class = self.reflection.find_class("PalItemContainer")
         item_slot_class = self.reflection.find_class("PalItemSlot")
+        overheat_base_class = 0
+        overheat_meta_classes: set[int] = set()
+        overheat_weapon_classes: set[int] = set()
+        overheat_weapon_instances: list[int] = []
+        overheat_offsets: tuple[int, int, int, int, int, int] | None = None
+        try:
+            overheat_base_class = self.reflection.find_class(
+                "BP_OverheatRifle_C"
+            )
+            overheat_meta_classes = {
+                self.reflection.find_class("Class"),
+                self.reflection.find_class("BlueprintGeneratedClass"),
+            }
+            overheat_offsets = (
+                self.reflection.property_offset(
+                    "BP_OverheatRifle_C",
+                    "HeatValue",
+                ),
+                self.reflection.property_offset(
+                    "BP_OverheatRifle_C",
+                    "Const_HeatUpOneShot",
+                ),
+                self.reflection.property_offset(
+                    "BP_OverheatRifle_C",
+                    "Const_HeatDownSpeed",
+                ),
+                self.reflection.property_offset(
+                    "BP_OverheatRifle_C",
+                    "IsOverHeatMode",
+                ),
+                self.reflection.property_offset(
+                    "BP_OverheatRifle_C",
+                    "Heat Value",
+                ),
+                self.reflection.property_offset(
+                    "BP_AssaultRifleBase_C",
+                    "IsInCoolTime",
+                ),
+            )
+        except TrainerError:
+            overheat_base_class = 0
+            overheat_meta_classes.clear()
+            overheat_offsets = None
         object_scan_index = self.reflection.object_array_stats()[2]
         player = None
         live_pals: list[PalTarget] = []
@@ -246,6 +304,17 @@ class TargetLocator:
         for obj in self.reflection.iter_objects():
             if obj.name.startswith("Default__"):
                 continue
+            if (
+                overheat_base_class
+                and obj.class_address in overheat_meta_classes
+                and self._is_child_of(
+                    obj.address,
+                    overheat_base_class,
+                )
+            ):
+                overheat_weapon_classes.add(obj.address)
+            if obj.class_address in overheat_weapon_classes:
+                overheat_weapon_instances.append(obj.address)
             if obj.class_address == individual_class:
                 individual_addresses.append(obj.address)
             if obj.name == "SightCheckAllPlayer":
@@ -406,6 +475,20 @@ class TargetLocator:
             sight_check_native,
             cone_check_native,
         )
+        overheat_weapon = None
+        if overheat_base_class and overheat_offsets:
+            overheat_weapon = OverheatWeaponLayout(
+                base_class=overheat_base_class,
+                meta_classes=tuple(overheat_meta_classes),
+                weapon_classes=tuple(overheat_weapon_classes),
+                instances=tuple(overheat_weapon_instances),
+                heat_value=overheat_offsets[0],
+                heat_per_shot=overheat_offsets[1],
+                cooling_speed=overheat_offsets[2],
+                is_overheated=overheat_offsets[3],
+                displayed_heat=overheat_offsets[4],
+                is_in_cool_time=overheat_offsets[5],
+            )
         return LiveTargets(
             player=player.actor,
             player_component=player.component,
@@ -425,6 +508,7 @@ class TargetLocator:
             world=world,
             world_settings=world_settings,
             stealth_branch=stealth_branch,
+            overheat_weapon=overheat_weapon,
             pals=tuple(owned_pals),
             all_pals=tuple(live_pals),
         )
@@ -506,6 +590,9 @@ class LiveTrainerSession:
         self._pending_pal_individuals: dict[int, int] = {}
         self._object_scan_index = 0
         self._next_pal_refresh = 0.0
+        self._overheat_weapon_classes: set[int] = set()
+        self._overheat_weapons: set[int] = set()
+        self._class_inheritance_cache: dict[tuple[int, int], bool] = {}
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
         self._lock = threading.RLock()
@@ -569,6 +656,17 @@ class LiveTrainerSession:
                 self._pending_pal_individuals.clear()
                 self._object_scan_index = targets.object_scan_index
                 self._next_pal_refresh = 0.0
+                self._overheat_weapon_classes = set(
+                    targets.overheat_weapon.weapon_classes
+                    if targets.overheat_weapon
+                    else ()
+                )
+                self._overheat_weapons = set(
+                    targets.overheat_weapon.instances
+                    if targets.overheat_weapon
+                    else ()
+                )
+                self._class_inheritance_cache.clear()
                 self.option_hook = option_hook
                 option_pointer = self._wait_for_option_pointer()
                 if process.read(
@@ -607,6 +705,9 @@ class LiveTrainerSession:
                 self._pending_pal_individuals.clear()
                 self._object_scan_index = 0
                 self._next_pal_refresh = 0.0
+                self._overheat_weapon_classes.clear()
+                self._overheat_weapons.clear()
+                self._class_inheritance_cache.clear()
                 raise
 
     def disconnect(self):
@@ -635,6 +736,9 @@ class LiveTrainerSession:
             self._pending_pal_individuals.clear()
             self._object_scan_index = 0
             self._next_pal_refresh = 0.0
+            self._overheat_weapon_classes.clear()
+            self._overheat_weapons.clear()
+            self._class_inheritance_cache.clear()
             self._exp_controls = None
             self._simple_patches.clear()
             if restore_errors:
@@ -1200,7 +1304,34 @@ class LiveTrainerSession:
             pass
         return target
 
-    def _refresh_owned_pals(self):
+    def _class_is_child_of(
+        self,
+        class_address: int,
+        parent_address: int,
+    ) -> bool:
+        if not self.reflection:
+            return False
+        key = (class_address, parent_address)
+        cached = self._class_inheritance_cache.get(key)
+        if cached is not None:
+            return cached
+        current = class_address
+        seen = set()
+        while current and current not in seen:
+            if current == parent_address:
+                self._class_inheritance_cache[key] = True
+                return True
+            seen.add(current)
+            try:
+                current = self.reflection.read_u64(
+                    current + USTRUCT_SUPER_STRUCT
+                )
+            except TrainerError:
+                break
+        self._class_inheritance_cache[key] = False
+        return False
+
+    def _refresh_dynamic_targets(self):
         if not self.process or not self.reflection or not self.targets:
             return
         now = time.monotonic()
@@ -1221,6 +1352,21 @@ class LiveTrainerSession:
                         obj.address,
                         0,
                     )
+                layout = self.targets.overheat_weapon
+                if layout and (
+                    obj.class_address in layout.meta_classes
+                    and self._class_is_child_of(
+                        obj.address,
+                        layout.base_class,
+                    )
+                ):
+                    self._overheat_weapon_classes.add(obj.address)
+                if (
+                    layout
+                    and obj.class_address in self._overheat_weapon_classes
+                    and not obj.name.startswith("Default__")
+                ):
+                    self._overheat_weapons.add(obj.address)
             self._object_scan_index = num_elements
             for individual, target in tuple(self._owned_pals.items()):
                 if not self._pal_individual_is_current(
@@ -1264,6 +1410,17 @@ class LiveTrainerSession:
         except TrainerError:
             return 0
 
+    def _overheat_weapon_is_current(self, weapon: int) -> bool:
+        if not self.process:
+            return False
+        try:
+            return (
+                self.process.read_u64(weapon + UOBJECT_CLASS_PRIVATE)
+                in self._overheat_weapon_classes
+            )
+        except TrainerError:
+            return False
+
     def _item_slot_is_current(self, slot: int) -> bool:
         if not self.process or not self.targets:
             return False
@@ -1287,7 +1444,7 @@ class LiveTrainerSession:
                             "玩家对象已重建，实时功能已自动关闭；请重新连接"
                         )
                         return
-                    self._refresh_owned_pals()
+                    self._refresh_dynamic_targets()
                     self._apply_continuous()
                     self.last_error = ""
                     self.last_tick = time.time()
@@ -1327,6 +1484,9 @@ class LiveTrainerSession:
 
     def _write_f32(self, feature_id: str, address: int, value: float, **kwargs):
         self._write(feature_id, address, struct.pack("<f", float(value)), **kwargs)
+
+    def _write_f64(self, feature_id: str, address: int, value: float, **kwargs):
+        self._write(feature_id, address, struct.pack("<d", float(value)), **kwargs)
 
     def _restore_feature_originals(self, feature_id: str):
         if not self.process:
@@ -1571,6 +1731,7 @@ class LiveTrainerSession:
             )
 
         self._apply_pal_stats()
+        self._apply_weapon_overheat()
         self._apply_world_settings()
 
     def _apply_pal_stats(self):
@@ -1629,6 +1790,53 @@ class LiveTrainerSession:
                         component + o.parameter_sp + o.fixed_point_value,
                         maximum,
                     )
+            except TrainerError:
+                continue
+
+    def _apply_weapon_overheat(self):
+        assert self.process and self.targets
+        if not self._state("instant_weapon_cooldown").enabled:
+            return
+        layout = self.targets.overheat_weapon
+        if not layout:
+            return
+        for weapon in tuple(self._overheat_weapons):
+            if not self._overheat_weapon_is_current(weapon):
+                self._overheat_weapons.discard(weapon)
+                continue
+            try:
+                self._write_f64(
+                    "instant_weapon_cooldown",
+                    weapon + layout.heat_value,
+                    0.0,
+                )
+                self._write_f64(
+                    "instant_weapon_cooldown",
+                    weapon + layout.displayed_heat,
+                    0.0,
+                )
+                self._write_f64(
+                    "instant_weapon_cooldown",
+                    weapon + layout.heat_per_shot,
+                    0.0,
+                    restore=True,
+                )
+                self._write_f64(
+                    "instant_weapon_cooldown",
+                    weapon + layout.cooling_speed,
+                    1000.0,
+                    restore=True,
+                )
+                self._write(
+                    "instant_weapon_cooldown",
+                    weapon + layout.is_overheated,
+                    b"\0",
+                )
+                self._write(
+                    "instant_weapon_cooldown",
+                    weapon + layout.is_in_cool_time,
+                    b"\0",
+                )
             except TrainerError:
                 continue
 

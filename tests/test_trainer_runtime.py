@@ -1,6 +1,11 @@
 import unittest
 
-from trainer_runtime import FeatureState, PalTarget, _filter_owned_pals
+from trainer_runtime import (
+    FeatureState,
+    OverheatWeaponLayout,
+    PalTarget,
+    _filter_owned_pals,
+)
 
 
 class TrainerRuntimeModelTests(unittest.TestCase):
@@ -32,6 +37,22 @@ class TrainerRuntimeModelTests(unittest.TestCase):
 
         selected = _filter_owned_pals(FakeProcess(), targets, 0x10, local_uid)
         self.assertEqual(selected, targets[:1])
+
+    def test_overheat_weapon_layout_tracks_inherited_weapon_classes(self):
+        layout = OverheatWeaponLayout(
+            base_class=1,
+            meta_classes=(2, 3),
+            weapon_classes=(4, 5),
+            instances=(6,),
+            heat_value=0x720,
+            heat_per_shot=0x728,
+            cooling_speed=0x730,
+            is_overheated=0x738,
+            displayed_heat=0x750,
+            is_in_cool_time=0x6C1,
+        )
+        self.assertIn(5, layout.weapon_classes)
+        self.assertEqual(layout.instances, (6,))
 
 
 if __name__ == "__main__":
