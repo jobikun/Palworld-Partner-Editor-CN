@@ -1691,15 +1691,31 @@ class LiveTrainerSession:
 
         movement_speed = self._state("movement_speed")
         if movement_speed.enabled and t.player_movement:
-            for offset in (
-                o.movement_max_walk_speed,
-                o.movement_max_walk_speed_crouched,
-                o.movement_max_swim_speed,
-                o.movement_max_fly_speed,
-                o.movement_max_custom_speed,
-            ):
+            speed_offsets = dict.fromkeys(
+                (
+                    o.movement_max_walk_speed,
+                    o.movement_max_walk_speed_crouched,
+                    o.movement_max_swim_speed,
+                    o.movement_max_fly_speed,
+                    o.movement_max_custom_speed,
+                    *o.movement_additional_speed_values,
+                )
+            )
+            for offset in speed_offsets:
                 address = t.player_movement + offset
                 original = self._original_f32("movement_speed", address)
+                if original <= 0.0:
+                    continue
+                self._write_f32(
+                    "movement_speed",
+                    address,
+                    original * float(movement_speed.value),
+                )
+            for offset in o.movement_acceleration_values:
+                address = t.player_movement + offset
+                original = self._original_f32("movement_speed", address)
+                if original <= 0.0:
+                    continue
                 self._write_f32(
                     "movement_speed",
                     address,

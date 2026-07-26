@@ -365,6 +365,11 @@ class PartnerEntity:
     def IsHuman(self) -> bool:
         return bool(self._legacy_species and self._legacy_species._human)
 
+    def IsSupportedPal(self) -> bool:
+        if self._species:
+            return True
+        return bool(self._legacy_species and not self._legacy_species._human)
+
     def GetCodeName(self) -> str:
         return self._code
 
@@ -732,6 +737,9 @@ class SaveSession:
             try:
                 entity = PartnerEntity(item)
                 if entity.IsHuman():
+                    continue
+                if not entity.IsSupportedPal():
+                    unknown += 1
                     continue
                 instance = str(item["key"]["InstanceId"]["value"])
                 records.append(PalRecord(entity, instance, str(entity.owner)))

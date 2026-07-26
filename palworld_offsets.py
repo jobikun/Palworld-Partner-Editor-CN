@@ -23,6 +23,8 @@ class PalworldOffsets:
     movement_max_swim_speed: int
     movement_max_fly_speed: int
     movement_max_custom_speed: int
+    movement_additional_speed_values: tuple[int, ...]
+    movement_acceleration_values: tuple[int, ...]
 
     parameter_individual_parameter: int
     parameter_sp: int
@@ -122,6 +124,38 @@ class PalworldOffsets:
             movement_max_custom_speed=prop(
                 "CharacterMovementComponent",
                 "MaxCustomMovementSpeed",
+            ),
+            movement_additional_speed_values=tuple(
+                prop("PalCharacterMovementComponent", name)
+                for name in (
+                    "SprintMaxSpeed",
+                    "GliderMaxSpeed",
+                    "SlidingStartSpeed",
+                    "SlidingMaxSpeed",
+                    "ClimbMaxSpeed",
+                    "RollingMaxSpeed",
+                    "SlowWalkSpeed_Default",
+                    "WalkSpeed_Default",
+                    "RunSpeed_Default",
+                    "RideSprintSpeed_Default",
+                    "FlySpeed_Default",
+                    "FlySprintSpeed_Default",
+                    "SwimSpeed_Default",
+                    "SwimDashSpeed_Default",
+                    "TransportSpeed_Default",
+                    "DashSwimMaxSpeed",
+                )
+            ),
+            movement_acceleration_values=(
+                prop("CharacterMovementComponent", "MaxAcceleration"),
+                prop(
+                    "PalCharacterMovementComponent",
+                    "SprintMaxAcceleration",
+                ),
+                prop(
+                    "PalCharacterMovementComponent",
+                    "SwimMaxAcceleration",
+                ),
             ),
             parameter_individual_parameter=prop(
                 "PalCharacterParameterComponent",

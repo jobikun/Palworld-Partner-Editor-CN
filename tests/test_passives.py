@@ -40,6 +40,12 @@ def partner_data():
     }
 
 
+def character_data(code):
+    data = partner_data()
+    data["value"]["RawData"]["value"]["object"]["SaveParameter"]["value"]["CharacterID"]["value"] = code
+    return data
+
+
 class PassiveEditingTests(unittest.TestCase):
     def test_each_partner_keeps_its_own_passives(self):
         first = PartnerEntity(partner_data())
@@ -69,6 +75,14 @@ class PassiveEditingTests(unittest.TestCase):
         entity.SetLevel(MAX_PAL_LEVEL)
         self.assertEqual(entity.GetLevel(), MAX_PAL_LEVEL)
         self.assertGreater(entity._obj["Exp"]["value"], 100)
+
+    def test_unknown_npc_is_not_treated_as_supported_pal(self):
+        entity = PartnerEntity(character_data("Police_Rifle_Crime_Lv5"))
+        self.assertFalse(entity.IsSupportedPal())
+
+    def test_known_pal_is_supported(self):
+        entity = PartnerEntity(character_data("SheepBall"))
+        self.assertTrue(entity.IsSupportedPal())
 
 
 if __name__ == "__main__":
