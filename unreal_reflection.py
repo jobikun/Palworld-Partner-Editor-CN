@@ -240,30 +240,53 @@ class UnrealReflection:
             self._object_name_cache[object_address] = cached
         return cached
 
-    def iter_object_addresses(self, *, limit: int | None = None) -> Iterator[tuple[int, int]]:
+    def iter_object_addresses(
+        self,
+        *,
+        start: int = 0,
+        limit: int | None = None,
+    ) -> Iterator[tuple[int, int]]:
+        if start < 0:
+            raise ValueError("对象起始索引不能小于 0")
+        if limit is not None and limit < 0:
+            raise ValueError("对象数量限制不能小于 0")
         objects, _, num_elements, _, num_chunks = self.object_array_stats()
-        remaining = min(num_elements, limit) if limit is not None else num_elements
-        index_base = 0
-        for chunk_index in range(num_chunks):
-            if remaining <= 0:
-                return
+        end = num_elements
+        if limit is not None:
+            end = min(end, start + limit)
+        if start >= end:
+            return
+        first_chunk = start // OBJECTS_PER_CHUNK
+        last_chunk = (end - 1) // OBJECTS_PER_CHUNK
+        for chunk_index in range(first_chunk, min(last_chunk + 1, num_chunks)):
             chunk = self.read_u64(objects + chunk_index * 8)
-            count = min(remaining, OBJECTS_PER_CHUNK)
+            chunk_base = chunk_index * OBJECTS_PER_CHUNK
+            chunk_start = max(start, chunk_base)
+            chunk_end = min(end, chunk_base + OBJECTS_PER_CHUNK)
+            count = chunk_end - chunk_start
             if not chunk:
-                index_base += count
-                remaining -= count
                 continue
-            raw = self.process.read(chunk, count * FUOBJECT_ITEM_SIZE)
+            local_start = chunk_start - chunk_base
+            raw = self.process.read(
+                chunk + local_start * FUOBJECT_ITEM_SIZE,
+                count * FUOBJECT_ITEM_SIZE,
+            )
             for local_index in range(count):
                 offset = local_index * FUOBJECT_ITEM_SIZE + FUOBJECT_ITEM_OBJECT
                 object_address = _u64(raw, offset)
                 if object_address:
-                    yield index_base + local_index, object_address
-            index_base += count
-            remaining -= count
+                    yield chunk_start + local_index, object_address
 
-    def iter_objects(self, *, limit: int | None = None) -> Iterator[UnrealObject]:
-        for index, address in self.iter_object_addresses(limit=limit):
+    def iter_objects(
+        self,
+        *,
+        start: int = 0,
+        limit: int | None = None,
+    ) -> Iterator[UnrealObject]:
+        for index, address in self.iter_object_addresses(
+            start=start,
+            limit=limit,
+        ):
 
 
             try:

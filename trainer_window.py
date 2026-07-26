@@ -399,7 +399,7 @@ class TrainerWindow(tk.Toplevel):
                 else 999.0
             )
             detail = (
-                f"已连接 · 队伍伙伴 {status['pals']} · "
+                f"已连接 · 全部伙伴 {status['pals']} · "
                 f"可用功能 {status['available']}/48"
             )
             if status["last_error"]:

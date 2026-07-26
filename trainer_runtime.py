@@ -65,6 +65,8 @@ class LiveTargets:
     money: int
     item_slots: tuple[int, ...]
     item_slot_class: int
+    individual_class: int
+    object_scan_index: int
     technology: int
     persistent_level: int
     world: int
@@ -229,16 +231,23 @@ class TargetLocator:
     def locate(self) -> LiveTargets:
         o = self.offsets
         character_class = self.reflection.find_class("PalCharacter")
+        individual_class = self.reflection.find_class(
+            "PalIndividualCharacterParameter"
+        )
         item_container_class = self.reflection.find_class("PalItemContainer")
         item_slot_class = self.reflection.find_class("PalItemSlot")
+        object_scan_index = self.reflection.object_array_stats()[2]
         player = None
-        pals: list[PalTarget] = []
+        live_pals: list[PalTarget] = []
+        individual_addresses: list[int] = []
         item_containers: list[int] = []
         sight_check_wrapper = 0
         cone_check_wrapper = 0
         for obj in self.reflection.iter_objects():
             if obj.name.startswith("Default__"):
                 continue
+            if obj.class_address == individual_class:
+                individual_addresses.append(obj.address)
             if obj.name == "SightCheckAllPlayer":
                 try:
                     if self.reflection.object_name(obj.outer_address) == "PalAISensorComponent":
@@ -283,7 +292,7 @@ class TargetLocator:
             if is_player == 1:
                 player = target
             else:
-                pals.append(target)
+                live_pals.append(target)
         if player is None:
             raise TrainerError(
                 "没有找到本地玩家。请先进入本地单人存档并站在可操作状态，再重新连接。"
@@ -296,9 +305,30 @@ class TargetLocator:
             if player_state
             else b"\0" * 16
         )
+        live_by_individual = {
+            target.individual: target
+            for target in live_pals
+        }
+        pal_candidates: list[PalTarget] = []
+        for individual in individual_addresses:
+            save = individual + o.individual_save_parameter
+            try:
+                if self.process.read(save + o.save_is_player, 1) != b"\0":
+                    continue
+            except MemoryReadError:
+                continue
+            target = live_by_individual.get(individual)
+            if target is None:
+                target = PalTarget(
+                    actor=0,
+                    component=0,
+                    individual=individual,
+                    save=save,
+                )
+            pal_candidates.append(target)
         owned_pals = _filter_owned_pals(
             self.process,
-            pals,
+            pal_candidates,
             o.save_owner_player_uid,
             player_uid,
         )
@@ -388,13 +418,15 @@ class TargetLocator:
             money=money,
             item_slots=tuple(slot for slot in item_slots if slot),
             item_slot_class=item_slot_class,
+            individual_class=individual_class,
+            object_scan_index=object_scan_index,
             technology=technology,
             persistent_level=persistent_level,
             world=world,
             world_settings=world_settings,
             stealth_branch=stealth_branch,
             pals=tuple(owned_pals),
-            all_pals=tuple(pals),
+            all_pals=tuple(live_pals),
         )
 
 
@@ -470,6 +502,10 @@ class LiveTrainerSession:
         self._original_values: dict[tuple[str, int], bytes] = {}
         self._simple_patches: dict[str, list[MemoryPatch]] = {}
         self._exp_controls: ExpHookControls | None = None
+        self._owned_pals: dict[int, PalTarget] = {}
+        self._pending_pal_individuals: dict[int, int] = {}
+        self._object_scan_index = 0
+        self._next_pal_refresh = 0.0
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
         self._lock = threading.RLock()
@@ -526,6 +562,13 @@ class LiveTrainerSession:
                 self.reflection = reflection
                 self.offsets = offsets
                 self.targets = targets
+                self._owned_pals = {
+                    target.individual: target
+                    for target in targets.pals
+                }
+                self._pending_pal_individuals.clear()
+                self._object_scan_index = targets.object_scan_index
+                self._next_pal_refresh = 0.0
                 self.option_hook = option_hook
                 option_pointer = self._wait_for_option_pointer()
                 if process.read(
@@ -560,6 +603,10 @@ class LiveTrainerSession:
                 self.transaction = None
                 self.option_hook = None
                 self._option_pointer = 0
+                self._owned_pals.clear()
+                self._pending_pal_individuals.clear()
+                self._object_scan_index = 0
+                self._next_pal_refresh = 0.0
                 raise
 
     def disconnect(self):
@@ -584,6 +631,10 @@ class LiveTrainerSession:
             self.transaction = None
             self.option_hook = None
             self._option_pointer = 0
+            self._owned_pals.clear()
+            self._pending_pal_individuals.clear()
+            self._object_scan_index = 0
+            self._next_pal_refresh = 0.0
             self._exp_controls = None
             self._simple_patches.clear()
             if restore_errors:
@@ -666,7 +717,7 @@ class LiveTrainerSession:
             "connected": self.connected,
             "pid": self.process.pid if self.process else 0,
             "player": self.targets.player if self.targets else 0,
-            "pals": len(self.targets.pals) if self.targets else 0,
+            "pals": len(self._owned_pals) if self.targets else 0,
             "options": self._option_pointer,
             "available": len(self.available_feature_ids()),
             "last_tick": self.last_tick,
@@ -1049,7 +1100,7 @@ class LiveTrainerSession:
         except TrainerError:
             return False
 
-    def _pal_target_is_current(
+    def _pal_individual_is_current(
         self,
         target: PalTarget,
         *,
@@ -1058,6 +1109,41 @@ class LiveTrainerSession:
         if not self.process or not self.offsets or not self.targets:
             return False
         p, o, t = self.process, self.offsets, self.targets
+        try:
+            if (
+                p.read_u64(target.individual + UOBJECT_CLASS_PRIVATE)
+                != t.individual_class
+            ):
+                return False
+            if target.save != target.individual + o.individual_save_parameter:
+                return False
+            if p.read(target.save + o.save_is_player, 1) != b"\0":
+                return False
+            if require_owner and (
+                p.read(target.save + o.save_owner_player_uid, 16)
+                != t.player_uid
+            ):
+                return False
+            return True
+        except TrainerError:
+            return False
+
+    def _live_pal_target_is_current(
+        self,
+        target: PalTarget,
+        *,
+        require_owner: bool,
+    ) -> bool:
+        if not self.process or not self.offsets:
+            return False
+        if not target.actor or not target.component:
+            return False
+        if not self._pal_individual_is_current(
+            target,
+            require_owner=require_owner,
+        ):
+            return False
+        p, o = self.process, self.offsets
         try:
             if (
                 p.read_u64(
@@ -1073,16 +1159,110 @@ class LiveTrainerSession:
                 != target.individual
             ):
                 return False
-            if p.read(target.save + o.save_is_player, 1) != b"\0":
-                return False
-            if require_owner and (
-                p.read(target.save + o.save_owner_player_uid, 16)
-                != t.player_uid
-            ):
-                return False
             return True
         except TrainerError:
             return False
+
+    def _owned_pal_target(self, individual: int) -> PalTarget | None:
+        if not self.process or not self.offsets or not self.targets:
+            return None
+        p, o, t = self.process, self.offsets, self.targets
+        save = individual + o.individual_save_parameter
+        target = PalTarget(
+            actor=0,
+            component=0,
+            individual=individual,
+            save=save,
+        )
+        if not self._pal_individual_is_current(
+            target,
+            require_owner=True,
+        ):
+            return None
+        try:
+            actor = p.read_u64(individual + o.individual_actor)
+            component = (
+                p.read_u64(actor + o.player_character_parameter_component)
+                if actor
+                else 0
+            )
+            if component and (
+                p.read_u64(component + o.parameter_individual_parameter)
+                == individual
+            ):
+                return PalTarget(
+                    actor=actor,
+                    component=component,
+                    individual=individual,
+                    save=save,
+                )
+        except TrainerError:
+            pass
+        return target
+
+    def _refresh_owned_pals(self):
+        if not self.process or not self.reflection or not self.targets:
+            return
+        now = time.monotonic()
+        if now < self._next_pal_refresh:
+            return
+        self._next_pal_refresh = now + 1.0
+        try:
+            num_elements = self.reflection.object_array_stats()[2]
+            if num_elements < self._object_scan_index:
+                self._object_scan_index = num_elements
+                self._pending_pal_individuals.clear()
+                return
+            for obj in self.reflection.iter_objects(
+                start=self._object_scan_index,
+            ):
+                if obj.class_address == self.targets.individual_class:
+                    self._pending_pal_individuals.setdefault(
+                        obj.address,
+                        0,
+                    )
+            self._object_scan_index = num_elements
+            for individual, target in tuple(self._owned_pals.items()):
+                if not self._pal_individual_is_current(
+                    target,
+                    require_owner=True,
+                ):
+                    self._owned_pals.pop(individual, None)
+            for individual in tuple(self._pending_pal_individuals):
+                target = self._owned_pal_target(individual)
+                if target is not None:
+                    self._owned_pals[individual] = target
+                    self._pending_pal_individuals.pop(individual, None)
+                    continue
+                attempts = self._pending_pal_individuals[individual] + 1
+                if attempts >= 10:
+                    self._pending_pal_individuals.pop(individual, None)
+                else:
+                    self._pending_pal_individuals[individual] = attempts
+        except TrainerError:
+            return
+
+    def _live_component_for_pal(self, target: PalTarget) -> int:
+        if not self.process or not self.offsets:
+            return 0
+        p, o = self.process, self.offsets
+        try:
+            actor = p.read_u64(target.individual + o.individual_actor)
+            if not actor:
+                return 0
+            component = p.read_u64(
+                actor + o.player_character_parameter_component
+            )
+            if not component:
+                return 0
+            if (
+                p.read_u64(component + o.parameter_individual_parameter)
+                != target.individual
+            ):
+                return 0
+            return component
+        except TrainerError:
+            return 0
 
     def _item_slot_is_current(self, slot: int) -> bool:
         if not self.process or not self.targets:
@@ -1107,6 +1287,7 @@ class LiveTrainerSession:
                             "玩家对象已重建，实时功能已自动关闭；请重新连接"
                         )
                         return
+                    self._refresh_owned_pals()
                     self._apply_continuous()
                     self.last_error = ""
                     self.last_tick = time.time()
@@ -1333,7 +1514,7 @@ class LiveTrainerSession:
         ai_speed = self._state("ai_speed")
         if ai_speed.enabled:
             for target in t.all_pals:
-                if not self._pal_target_is_current(
+                if not self._live_pal_target_is_current(
                     target,
                     require_owner=False,
                 ):
@@ -1401,8 +1582,8 @@ class LiveTrainerSession:
         stamina = self._state("pal_infinite_stamina")
         if not any(state.enabled for state in (health, food, san, stamina)):
             return
-        for target in self.targets.pals:
-            if not self._pal_target_is_current(
+        for target in tuple(self._owned_pals.values()):
+            if not self._pal_individual_is_current(
                 target,
                 require_owner=True,
             ):
@@ -1436,13 +1617,16 @@ class LiveTrainerSession:
                         9999.0,
                     )
                 if stamina.enabled:
+                    component = self._live_component_for_pal(target)
+                    if not component:
+                        continue
                     maximum = self.process.read(
                         target.save + o.save_max_sp + o.fixed_point_value,
                         8,
                     )
                     self._write(
                         "pal_infinite_stamina",
-                        target.component + o.parameter_sp + o.fixed_point_value,
+                        component + o.parameter_sp + o.fixed_point_value,
                         maximum,
                     )
             except TrainerError:

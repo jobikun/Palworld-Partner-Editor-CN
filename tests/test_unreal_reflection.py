@@ -3,6 +3,13 @@ import unittest
 
 from memory_trainer import MemoryReadError
 from unreal_reflection import (
+    FUOBJECT_ARRAY_OBJ_OBJECTS,
+    FUOBJECT_ITEM_SIZE,
+    TUOBJECT_ARRAY_MAX_CHUNKS,
+    TUOBJECT_ARRAY_MAX_ELEMENTS,
+    TUOBJECT_ARRAY_NUM_CHUNKS,
+    TUOBJECT_ARRAY_NUM_ELEMENTS,
+    TUOBJECT_ARRAY_OBJECTS,
     UnrealCoreAddresses,
     UnrealReflection,
     resolve_rip_target,
@@ -69,6 +76,40 @@ class UnrealReflectionTests(unittest.TestCase):
         )
         reflection.iter_object_addresses = lambda **_kwargs: iter(((7, 0x50000),))
         self.assertEqual(list(reflection.iter_objects()), [])
+
+    def test_object_iteration_can_start_at_new_object_index(self):
+        process = FakeProcess()
+        guobject_array = 0x30000
+        array = guobject_array + FUOBJECT_ARRAY_OBJ_OBJECTS
+        chunks = 0x50000
+        chunk = 0x60000
+        process.put(array + TUOBJECT_ARRAY_OBJECTS, struct.pack("<Q", chunks))
+        process.put(array + TUOBJECT_ARRAY_MAX_ELEMENTS, struct.pack("<i", 6))
+        process.put(array + TUOBJECT_ARRAY_NUM_ELEMENTS, struct.pack("<i", 6))
+        process.put(array + TUOBJECT_ARRAY_MAX_CHUNKS, struct.pack("<i", 1))
+        process.put(array + TUOBJECT_ARRAY_NUM_CHUNKS, struct.pack("<i", 1))
+        process.put(chunks, struct.pack("<Q", chunk))
+        raw = bytearray(6 * FUOBJECT_ITEM_SIZE)
+        for index in range(6):
+            struct.pack_into(
+                "<Q",
+                raw,
+                index * FUOBJECT_ITEM_SIZE,
+                0x70000 + index * 0x100,
+            )
+        process.put(chunk, raw)
+        reflection = UnrealReflection(
+            process,
+            UnrealCoreAddresses(
+                guobject_array=guobject_array,
+                fname_pool=0x10000,
+                fname_to_string=0x40000,
+            ),
+        )
+        self.assertEqual(
+            list(reflection.iter_object_addresses(start=3, limit=2)),
+            [(3, 0x70300), (4, 0x70400)],
+        )
 
 
 if __name__ == "__main__":
